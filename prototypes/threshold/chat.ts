@@ -13,8 +13,8 @@
  */
 import type { Conversation, Memory } from '../../reference/hackathon-pack/src/types';
 import { createVoiceInput, pushToTalk } from '../_voice';
-import { renderGoals, renderPeople, renderTasks, screenStrip, type Nav } from './views';
-import { firstName, initials, type PersonView, type TaskView, type Workspace } from './workspace';
+import { renderGoals, renderPeople, renderRewind, renderTasks, screenPreview, type Nav } from './views';
+import { firstName, initials, type PersonView, type ScreenCapture, type TaskView, type Workspace } from './workspace';
 
 export interface OmiAppOptions {
   workspace: Workspace;
@@ -22,6 +22,11 @@ export interface OmiAppOptions {
   focusPersonId: string;
   /** A question spoken at the card, carried straight into the thread. */
   asking?: string;
+  /**
+   * App that caused the card — screens in chat are filtered to this context so a
+   * Slack trigger never shows a Mail mock, and vice versa.
+   */
+  contextApp?: string;
   onClose(): void;
 }
 
@@ -134,8 +139,16 @@ const PROMPTS: Prompt[] = [
  * The window
  * ---------------------------------------------------------------------- */
 
+/** Screens that belong to the window that caused this handoff. Same window → same set. */
+function contextualScreens(screens: ScreenCapture[] | undefined, contextApp?: string): ScreenCapture[] {
+  if (!screens?.length) return [];
+  if (!contextApp) return screens;
+  const matched = screens.filter((screen) => screen.app === contextApp);
+  return matched.length > 0 ? matched : screens;
+}
+
 export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
-  const { workspace, onClose } = options;
+  const { workspace, onClose, contextApp } = options;
   let focus = workspace.personById.get(options.focusPersonId) ?? workspace.people[0]!;
 
   const win = document.createElement('section');
@@ -154,6 +167,7 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
         <button class="side-item" type="button" data-nav="tasks">Tasks</button>
         <button class="side-item" type="button" data-nav="goals">Goals</button>
         <button class="side-item" type="button" data-nav="people">People</button>
+        <button class="side-item" type="button" data-nav="rewind">Rewind</button>
       </nav>
       <div class="win-view" data-view></div>
     </div>
@@ -165,13 +179,15 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
   /* -- chat view ------------------------------------------------------- */
 
   let thread: HTMLElement | undefined;
+  /** The scroller wrapping the context rail and the thread. */
+  let scroller: HTMLElement | undefined;
   let chips: HTMLElement | undefined;
   let input: HTMLInputElement | undefined;
   let bars: HTMLElement[] = [];
   const asked = new Set<string>();
 
   function scrollToEnd(): void {
-    if (thread) thread.scrollTop = thread.scrollHeight;
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
   }
 
   function addUser(text: string): void {
@@ -231,12 +247,32 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
     addOmi(prompt.answer(focus, workspace));
   }
 
+  function submitComposer(): void {
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    addUser(text);
+    const match =
+      PROMPTS.find((prompt) =>
+        prompt.label
+          .toLowerCase()
+          .split(' ')
+          .some((word) => word.length > 3 && text.toLowerCase().includes(word)),
+      ) ?? PROMPTS[0]!;
+    asked.add(match.label);
+    paintChips();
+    addOmi(match.answer(focus, workspace));
+  }
+
   function buildChat(): HTMLElement {
     const view = document.createElement('div');
     view.className = 'view view-chat';
     view.innerHTML = `
-      <div class="ctx-rail" data-rail></div>
-      <div class="thread" data-thread></div>
+      <div class="chat-scroll" data-scroll>
+        <div class="ctx-rail" data-rail></div>
+        <div class="thread" data-thread></div>
+      </div>
       <footer class="win-foot">
         <div class="chips" data-chips></div>
         <form class="composer" data-composer>
@@ -249,6 +285,7 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
       </footer>
     `;
 
+    scroller = view.querySelector<HTMLElement>('[data-scroll]')!;
     thread = view.querySelector<HTMLElement>('[data-thread]')!;
     chips = view.querySelector<HTMLElement>('[data-chips]')!;
     input = view.querySelector<HTMLInputElement>('[data-input]')!;
@@ -262,20 +299,13 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
     const form = view.querySelector<HTMLFormElement>('[data-composer]')!;
     form.addEventListener('submit', (event) => {
       event.preventDefault();
-      const text = input!.value.trim();
-      if (!text) return;
-      input!.value = '';
-      addUser(text);
-      const match =
-        PROMPTS.find((prompt) =>
-          prompt.label
-            .toLowerCase()
-            .split(' ')
-            .some((word) => word.length > 3 && text.toLowerCase().includes(word)),
-        ) ?? PROMPTS[0]!;
-      asked.add(match.label);
-      paintChips();
-      addOmi(match.answer(focus, workspace));
+      submitComposer();
+    });
+    // Explicit Enter — some hosts swallow the implicit form submit on a lone input.
+    input.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' || event.isComposing) return;
+      event.preventDefault();
+      submitComposer();
     });
 
     paintChips();
@@ -316,8 +346,9 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
       <span class="ctx-kind">Task</span>
     `;
 
-    if (task!.screens?.length) {
-      card.querySelector<HTMLElement>('.ctx-body')!.append(screenStrip(task!.screens));
+    const shots = contextualScreens(task!.screens, contextApp);
+    if (shots.length) {
+      card.querySelector<HTMLElement>('.ctx-body')!.append(screenPreview(shots));
     }
 
     const check = card.querySelector<HTMLButtonElement>('.ctx-check')!;
@@ -338,7 +369,8 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
     | { view: 'chat' }
     | { view: 'tasks'; goalId?: string; personId?: string }
     | { view: 'goals' }
-    | { view: 'people' };
+    | { view: 'people' }
+    | { view: 'rewind' };
 
   let route: Route = { view: 'chat' };
 
@@ -368,7 +400,7 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
     }
 
     if (next.view !== 'chat') {
-      thread = chips = input = undefined;
+      thread = scroller = chips = input = undefined;
       bars = [];
     }
 
@@ -384,6 +416,9 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
     } else if (next.view === 'goals') {
       titleEl.textContent = 'Goals';
       viewHost.replaceChildren(renderGoals(workspace, nav));
+    } else if (next.view === 'rewind') {
+      titleEl.textContent = 'Rewind';
+      viewHost.replaceChildren(renderRewind(workspace, nav));
     } else {
       titleEl.textContent = 'People';
       viewHost.replaceChildren(renderPeople(workspace, nav));
@@ -397,6 +432,7 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
       if (target === 'tasks') go({ view: 'tasks' });
       else if (target === 'goals') go({ view: 'goals' });
       else if (target === 'people') go({ view: 'people' });
+      else if (target === 'rewind') go({ view: 'rewind' });
       else go({ view: 'chat' });
     });
   }

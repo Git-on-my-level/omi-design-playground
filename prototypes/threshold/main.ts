@@ -30,8 +30,12 @@ const LEAD_SECONDS = 4 * 60;
  * There is no real clock behind a Slack DM, so it borrows the calendar's lead.
  */
 const DWELL_SECONDS = LEAD_SECONDS;
-/** The alert sits alone before the card it causes arrives. */
-const ALERT_HOLD_MS = 1500;
+/** The alert sits alone before the card slides in under it. */
+const ALERT_HOLD_MS = 1100;
+/** How long the alert and the card share the corner before the alert dismisses. */
+const BOTH_VISIBLE_MS = 2400;
+/** Gap between the alert's bottom edge and the card that sits under it. */
+const STACK_GAP = 12;
 /** Quiet beat between one card leaving and the next arriving. */
 const LULL_MS = 2200;
 
@@ -286,32 +290,50 @@ let index = 0;
 let ticker: number | undefined;
 /** The system chrome currently on screen, if any. Never more than one. */
 let currentAlert: HTMLElement | undefined;
+/** Timers for the current event, cleared when the next event starts. */
+let alertTimers: number[] = [];
 
-/** The alert slides off as the card arrives — one object holds the corner. */
+function clearAlertTimers(): void {
+  for (const id of alertTimers) window.clearTimeout(id);
+  alertTimers = [];
+}
+
+/** The alert slides off; the card rises into its place only after the alert is gone. */
 function dismissAlert(): void {
   if (!currentAlert) return;
   const leaving = currentAlert;
   currentAlert = undefined;
   leaving.classList.add('is-leaving');
-  window.setTimeout(() => leaving.remove(), 420);
+  window.setTimeout(() => {
+    leaving.remove();
+    // Rise only once the alert has left — and only if nothing new took the corner.
+    if (!currentAlert) root.style.top = '';
+  }, 420);
 }
 
 /**
- * One screen event: the system alert arrives, holds a beat, and hands the corner
- * to the Omi card it caused. The alert is the desktop's own chrome; the card is
- * Omi's. Their contrast — solid versus glass — is how you know the card was
- * never a window.
+ * One screen event: the system alert arrives, and a beat later the card slides in
+ * *under* it, so the cause and the response are visible together. The alert is
+ * the desktop's own chrome; the card is Omi's. Their contrast — solid versus
+ * glass — is how you know the card was never a window. When the alert dismisses,
+ * the card bumps up into the resting slot it would have had on its own.
  */
 function present(event: ScreenEvent): void {
+  clearAlertTimers();
   dismissAlert();
+
   const alert = buildAlert(event.trigger, FIXTURE_NOW.getDate());
   currentAlert = alert;
   stage.surface.append(alert);
+  // Drop the card slot to just below the alert, once its height is measurable.
+  window.requestAnimationFrame(() => {
+    if (currentAlert === alert) root.style.top = `${46 + alert.offsetHeight + STACK_GAP}px`;
+  });
 
-  window.setTimeout(() => {
-    dismissAlert();
-    showCard(event.brief, event.trigger);
-  }, ALERT_HOLD_MS);
+  alertTimers.push(
+    window.setTimeout(() => showCard(event.brief, event.trigger), ALERT_HOLD_MS),
+  );
+  alertTimers.push(window.setTimeout(dismissAlert, ALERT_HOLD_MS + BOTH_VISIBLE_MS));
 }
 
 function showCard(brief: Brief, trigger: Trigger): void {
@@ -427,6 +449,9 @@ function showCard(brief: Brief, trigger: Trigger): void {
       workspace,
       focusPersonId: brief.person.id,
       asking,
+      // Calendar sync → Mail draft; the other triggers name their own app.
+      contextApp:
+        trigger.kind === 'calendar' ? 'Mail' : trigger.kind === 'meet' ? 'Meet' : trigger.kind === 'slack' ? 'Slack' : 'Mail',
       onClose: () => {
         chat = undefined;
         // The moment is over either way. Threshold does not resume a card.

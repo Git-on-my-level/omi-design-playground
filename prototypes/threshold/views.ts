@@ -78,15 +78,27 @@ const STATE_LABEL: Record<ScreenCapture['state'], string> = {
   done: 'Done',
 };
 
-/** A wireframe stand-in for the app that was on screen. Suggestive, not literal. */
-function shotWire(app: string): string {
-  if (app === 'Meet') {
+/** Paint detail lines when present; otherwise a suggestive wireframe for the app. */
+function shotWire(screen: ScreenCapture): string {
+  if (screen.detail?.length) {
+    const kind = screen.app === 'Slack' ? 'slack' : screen.app === 'Mail' ? 'mail' : screen.app === 'Meet' ? 'meet' : 'doc';
+    return `<div class="wire wire-detail wire-${kind}">${screen.detail
+      .map((line, i) => {
+        const last = i === screen.detail!.length - 1 && screen.state === 'done';
+        return `<span class="wd${last ? ' is-answer' : ''}">${line}</span>`;
+      })
+      .join('')}</div>`;
+  }
+  if (screen.app === 'Meet') {
     return '<div class="wire wire-meet"><span></span><span></span><span></span><span></span></div>';
   }
-  if (app === 'Slack' || app === 'Mail') {
-    return '<div class="wire wire-msg"><span class="wl"></span><span class="wl short"></span><span class="wl"></span></div>';
+  if (screen.app === 'Slack') {
+    return '<div class="wire wire-slack"><span class="wt">Threads</span><span class="wl"></span><span class="wl short"></span><span class="wl"></span></div>';
   }
-  if (app === 'Code review') {
+  if (screen.app === 'Mail') {
+    return '<div class="wire wire-mail"><span class="wl short"></span><span class="wl"></span><span class="wl"></span><span class="wl short"></span></div>';
+  }
+  if (screen.app === 'Code review') {
     return '<div class="wire wire-code"><span class="wl"></span><span class="wl short"></span><span class="wl"></span><span class="wl short"></span></div>';
   }
   return '<div class="wire wire-doc"><span class="wl"></span><span class="wl"></span><span class="wl short"></span></div>';
@@ -97,7 +109,7 @@ function shotThumb(screen: ScreenCapture): string {
     <figure class="shot shot-${screen.state}">
       <div class="shot-frame">
         <div class="shot-bar"><i></i><i></i><i></i><span>${screen.app}</span></div>
-        <div class="shot-body">${shotWire(screen.app)}</div>
+        <div class="shot-body">${shotWire(screen)}</div>
       </div>
       <figcaption class="shot-cap">${screen.caption}</figcaption>
       <p class="shot-meta"><span class="shot-state">${STATE_LABEL[screen.state]}</span>${screen.at}</p>
@@ -112,6 +124,56 @@ export function screenStrip(screens: ScreenCapture[]): HTMLElement {
     <div class="screens-row">${screens.map(shotThumb).join('')}</div>
   `;
   return wrap;
+}
+
+/**
+ * A tiny stand-in that rides in a task row's tail without adding height. Click it
+ * to see the full captures. The count hints there is more than one behind it.
+ */
+export function screenPreview(screens: ScreenCapture[]): HTMLElement {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'shot-mini';
+  btn.title = 'Seen on screen';
+  btn.innerHTML = `
+    <span class="shot-mini-frame">
+      <span class="shot-mini-bar"></span>
+      <span class="shot-mini-lines"><i></i><i></i></span>
+    </span>
+    ${screens.length > 1 ? `<span class="shot-mini-n">${screens.length}</span>` : ''}
+  `;
+  btn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    openLightbox(screens);
+  });
+  return btn;
+}
+
+/** The captures, full size, over a dim backdrop. Click away or Esc to close. */
+export function openLightbox(screens: ScreenCapture[]): void {
+  const overlay = document.createElement('div');
+  overlay.className = 'shots-lightbox';
+  const panel = document.createElement('div');
+  panel.className = 'shots-panel';
+  panel.append(screenStrip(screens));
+  overlay.append(panel);
+
+  const close = (): void => {
+    overlay.classList.add('is-closing');
+    window.setTimeout(() => overlay.remove(), 180);
+    document.removeEventListener('keydown', onKey);
+  };
+  const onKey = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      close();
+    }
+  };
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) close();
+  });
+  document.addEventListener('keydown', onKey);
+  document.body.append(overlay);
 }
 
 /* ---------------------------------------------------------------------- *
@@ -144,6 +206,8 @@ export function taskRow(task: TaskView, workspace: Workspace, nav: Nav, options:
   `;
 
   const tail = wrap.querySelector<HTMLElement>('.task-tail')!;
+  // A tiny preview, not a strip: it rides in the tail without growing the row.
+  if (task.screens?.length) tail.append(screenPreview(task.screens));
   if (options.showGoal) tail.append(goalChip(task.goal, nav));
   if (options.showPerson && task.person) {
     const view = workspace.personById.get(task.person.id);
@@ -155,25 +219,19 @@ export function taskRow(task: TaskView, workspace: Workspace, nav: Nav, options:
     wrap.classList.toggle('is-done');
   });
 
-  /*
-   * The receipt: why believe this (the transcript line), and now how far along
-   * (the screens Omi says it saw). Either alone is enough to make the row unfold.
-   */
+  /* The receipt: the transcript line the claim came from. Screens live in the
+     tail preview and the Rewind tab, so the row stays one drag deep. */
   const segments = task.source?.segments ?? [];
-  const screens = task.screens ?? [];
-  if (segments.length > 0 || screens.length > 0) {
+  if (segments.length > 0) {
     wrap.classList.add('has-receipt');
     const slot = wrap.querySelector<HTMLElement>('[data-receipt]')!;
-    if (segments.length > 0) {
-      slot.innerHTML = `
-        <p class="receipt-src">${task.source!.title} · ${relativeDays(task.source!.startedAt)}</p>
-        ${segments
-          .slice(0, 3)
-          .map((s) => `<p class="receipt-l"><span>${s.speaker}:</span> ${s.text}</p>`)
-          .join('')}
-      `;
-    }
-    if (screens.length > 0) slot.append(screenStrip(screens));
+    slot.innerHTML = `
+      <p class="receipt-src">${task.source!.title} · ${relativeDays(task.source!.startedAt)}</p>
+      ${segments
+        .slice(0, 3)
+        .map((s) => `<p class="receipt-l"><span>${s.speaker}:</span> ${s.text}</p>`)
+        .join('')}
+    `;
     wrap.querySelector<HTMLElement>('.task-row')!.addEventListener('click', () => {
       const open = wrap.classList.toggle('is-open');
       slot.style.height = open ? `${slot.scrollHeight}px` : '0px';
@@ -567,6 +625,58 @@ export function renderPeople(workspace: Workspace, nav: Nav): HTMLElement {
     `;
     row.addEventListener('click', () => nav.person(view.person.id));
     rows.append(row);
+  }
+
+  return page;
+}
+
+/* ---------------------------------------------------------------------- *
+ * Rewind
+ *
+ * One place to see every screen Omi says it saw, per task, newest first. It is
+ * still not a feed of "what Omi saw" out in the card — it lives behind the
+ * handoff door, where browsing is allowed. Synthetic; the captures are drawn,
+ * not real screenshots, and labelled as much.
+ * ---------------------------------------------------------------------- */
+
+export function renderRewind(workspace: Workspace, nav: Nav): HTMLElement {
+  const page = document.createElement('div');
+  page.className = 'view';
+
+  const clips = workspace.tasks.filter((task) => task.screens?.length);
+  const shots = clips.reduce((n, task) => n + (task.screens?.length ?? 0), 0);
+
+  page.innerHTML = `
+    <header class="lens">
+      <h1 class="lens-title">Rewind</h1>
+      <p class="lens-sub">${shots} screens across ${clips.length} tasks, seen while your work moved.</p>
+    </header>
+    <div class="rewind" data-rewind></div>
+  `;
+
+  const host = page.querySelector<HTMLElement>('[data-rewind]')!;
+  if (clips.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'empty';
+    empty.textContent = 'Nothing on screen yet.';
+    host.append(empty);
+    return page;
+  }
+
+  for (const task of clips) {
+    const clip = document.createElement('section');
+    clip.className = 'rw';
+    clip.innerHTML = `
+      <header class="rw-head">
+        <button class="rw-title" type="button"></button>
+        <span class="rw-meta">${[task.person && firstName(task.person), task.goal.title].filter(Boolean).join(' · ')}</span>
+      </header>
+    `;
+    const title = clip.querySelector<HTMLButtonElement>('.rw-title')!;
+    title.textContent = task.action.title;
+    title.addEventListener('click', () => nav.goal(task.goal.id));
+    clip.append(screenStrip(task.screens!));
+    host.append(clip);
   }
 
   return page;

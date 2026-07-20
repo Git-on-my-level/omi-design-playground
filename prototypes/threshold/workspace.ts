@@ -89,34 +89,143 @@ export interface ScreenCapture {
   /** When it was on screen, already formatted for display. */
   at: string;
   state: 'opened' | 'progress' | 'done';
+  /**
+   * Lines painted inside the mock window — subject + body for Mail, channel +
+   * messages for Slack, etc. The last line of a `done` capture is the submitted
+   * answer when there is one.
+   */
+  detail?: string[];
 }
 
 /*
- * Fabricated screen trails, keyed by action id. The SDK has no screenshots, so
- * every entry here is written, not observed — the app renders them as mock
- * windows labelled "seen on screen". Only a handful of actions carry one; the
- * rest fall back to their transcript receipt alone.
+ * Fabricated screen trails, keyed by action id. Each trail stays inside one app
+ * so a Slack-triggered handoff only ever shows Slack, a Mail one only Mail.
+ * The SDK has no screenshots — these are written, rendered as mock windows, and
+ * labelled "seen on screen". A `done` frame carries the submitted answer.
  */
 const SCREEN_CAPTURES: Record<string, ScreenCapture[]> = {
+  // Priya · calendar sync → the Mail draft that is the commitment.
   'action-001': [
-    { app: 'Pages', caption: 'Started the decision trail doc', at: '2:12 PM', state: 'opened' },
-    { app: 'Drive', caption: 'Shared the workshop export folder', at: '3:41 PM', state: 'progress' },
-    { app: 'Mail', caption: 'Draft to Priya, not sent', at: '5:06 PM', state: 'done' },
+    {
+      app: 'Mail',
+      caption: 'Draft to Priya — decision trail',
+      at: '2:12 PM',
+      state: 'opened',
+      detail: ['To: Priya Shah', 'Subject: Workshop decision trail', 'Priya —', 'Capturing the decision and the reason together…'],
+    },
+    {
+      app: 'Mail',
+      caption: 'Sent: workshop decision trail',
+      at: '5:06 PM',
+      state: 'done',
+      detail: [
+        'To: Priya Shah',
+        'Subject: Workshop decision trail',
+        'Sent',
+        'The useful outcome is a next test the team can run this week — decision + reason attached.',
+      ],
+    },
   ],
+  // Taylor · Meet pre-join.
   'action-002': [
-    { app: 'Meet', caption: 'Export pilot review with Taylor', at: '4:27 PM', state: 'opened' },
-    { app: 'Code review', caption: 'Export shape pull request', at: '5:02 PM', state: 'progress' },
+    {
+      app: 'Meet',
+      caption: 'Export pilot review with Taylor',
+      at: '4:27 PM',
+      state: 'opened',
+      detail: ['Export pilot review', 'Taylor Reed is in the call', 'You · joining'],
+    },
+    {
+      app: 'Meet',
+      caption: 'Confirmed the narrow pilot',
+      at: '5:02 PM',
+      state: 'done',
+      detail: ['Export pilot review', 'Agreed: single export shape', 'Taylor: ready for a narrow pilot.'],
+    },
   ],
   'action-005': [
-    { app: 'Pages', caption: 'Smallest useful slice outline', at: '10:20 AM', state: 'opened' },
-    { app: 'Mail', caption: 'Sent the outline to Avery', at: '11:58 AM', state: 'done' },
+    {
+      app: 'Mail',
+      caption: 'Outline draft to Avery',
+      at: '10:20 AM',
+      state: 'opened',
+      detail: ['To: Avery Chen', 'Subject: Smallest useful slice', 'Avery — draft outline below.'],
+    },
+    {
+      app: 'Mail',
+      caption: 'Sent the outline to Avery',
+      at: '11:58 AM',
+      state: 'done',
+      detail: ['To: Avery Chen', 'Subject: Smallest useful slice', 'Sent', 'One deliberately small slice; what it does not solve is listed.'],
+    },
   ],
+  // Morgan · Slack DM (and a sibling thread in the same workspace).
   'action-006': [
-    { app: 'Slack', caption: 'Morgan on the workaround pattern', at: '4:48 PM', state: 'opened' },
+    {
+      app: 'Slack',
+      caption: 'DM · Morgan on the workaround',
+      at: '4:48 PM',
+      state: 'opened',
+      detail: [
+        'Threads',
+        '# research-triage · pattern notes',
+        'Morgan Ellis · DM',
+        'Morgan: Did the workaround pattern hold up?',
+      ],
+    },
+    {
+      app: 'Slack',
+      caption: 'Reply sent in the DM',
+      at: '5:14 PM',
+      state: 'done',
+      detail: [
+        'Morgan Ellis · DM',
+        'Morgan: Did the workaround pattern hold up?',
+        'You: Yes — the repeated workaround is the signal. Walk it tomorrow?',
+      ],
+    },
+  ],
+  // Quinn · Mail reply about the practice-sharing call.
+  'action-014': [
+    {
+      app: 'Mail',
+      caption: 'Quinn replied — practice call',
+      at: '3:22 PM',
+      state: 'opened',
+      detail: [
+        'From: Quinn Ellis',
+        'Subject: Re: the next practice-sharing call',
+        'Happy to host again — want a phrase people can attach to an owner?',
+      ],
+    },
+    {
+      app: 'Mail',
+      caption: 'Invite sent to Quinn',
+      at: '4:05 PM',
+      state: 'done',
+      detail: [
+        'To: Quinn Ellis',
+        'Subject: Invite: practice-sharing call',
+        'Sent',
+        'You’re invited to the next practice-sharing call — phrase + owner on the agenda.',
+      ],
+    },
   ],
   'action-011': [
-    { app: 'Figma', caption: 'Thread-first prototype frame', at: '1:33 PM', state: 'opened' },
-    { app: 'Figma', caption: 'Progressive map reveal', at: '2:15 PM', state: 'progress' },
+    {
+      app: 'Figma',
+      caption: 'Thread-first prototype frame',
+      at: '1:33 PM',
+      state: 'opened',
+      detail: ['Thread-first', 'Map · progressive reveal'],
+    },
+    {
+      app: 'Figma',
+      caption: 'Progressive map reveal',
+      at: '2:15 PM',
+      state: 'progress',
+      detail: ['Thread-first', 'Reveal on expand'],
+    },
   ],
 };
 

@@ -36,9 +36,11 @@ what Omi saw. The moment there is a list of triggers, this has become a notifica
 
 ## The demo
 
-A short sequence of screen events, each tied to one brief. The system alert slides in, holds a
-beat, and hands the corner to the Omi card it caused — one object rests there at a time.
-Interactions, in order of how much they ask of you:
+A short sequence of screen events, each tied to one brief. The system alert slides in, and a beat
+later the Omi card arrives *beneath* it — the cause and the response visible together. When the
+alert dismisses, the card rises into the slot it would have had alone. This is not two cards: the
+alert is the desktop's own chrome, and only ever one Omi card is on screen. Interactions, in order
+of how much they ask of you:
 
 1. **Read it.** It self-dismisses when the meeting starts.
 2. **Push it away** — a flick sends it off-screen with real momentum; it does not come back.
@@ -60,7 +62,7 @@ The app behind the door has one substrate and two lenses. **Tasks are the only o
 
 That is the correction that made it simple. The first build gave people their own expanded page: open items, goals, memories, conversation history, four stacked sections. It was a CRM record sitting next to a task tracker, and the two disagreed about which object was primary. Making a person a *lens* answers it — the commitment is primary, and a person is a question you ask about it. Memory survives as a compact context block in the lens header, which is the right size for it: it is what you need to know before you act on the list below, not a page to browse.
 
-Goals are derived from the conversations their commitments came out of, which is the only structure the fixture can honestly support. And every task can unfold its receipt — the verbatim line that produced it, and, for some, the **screens Omi says it saw** while the work moved: small framed mock windows that track a task from *opened* through *in progress* to *done*, labelled "seen on screen". The receipt now answers two questions at once — why believe this, and how far along. That pairing is the part no other tracker can copy.
+Goals are derived from the conversations their commitments came out of, which is the only structure the fixture can honestly support. And every task can unfold its receipt — the verbatim line that produced it: *why believe this*. Tasks Omi also watched carry a tiny **screen-capture preview** in the row's tail that does not grow the row; click it and the full mock windows open in a lightbox, tracking a task from *opened* through *in progress* to *done* — *how far along*. A dedicated **Rewind** tab collects every capture, grouped by task. All of that lives behind the handoff door, where browsing is the point; the card and the row stay a single glance. That pairing — why believe this, and how far along — is the part no other tracker can copy.
 
 That density is exactly what the card must never become. The card is one fact; the app is the whole graph. Keeping them in one prototype is deliberate — it is the argument that an interruption earns its place by being *narrower* than the thing it can open, not by being a smaller copy of it.
 
@@ -122,4 +124,4 @@ The window it hands off to is **not** glass. Windows on this desktop are solid; 
 
 ## Failure mode to avoid
 
-Becoming a notification center. The moment there is a stack, a history, or an "earlier today" section, Threshold has died and become `attention`. One card, one moment, then gone.
+Becoming a notification center. The moment there is a stack of *cards*, a history, or an "earlier today" section *on the card surface*, Threshold has died and become `attention`. The card is always one, and always the present moment. Browsing — the Rewind tab, the task list, the screen captures — is allowed only behind the handoff door, never in the interruption itself. One card, one moment, then gone.
