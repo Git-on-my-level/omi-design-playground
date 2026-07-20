@@ -13,6 +13,7 @@
  * has no schedule and Omi is not really watching a screen here; the point is the
  * shape of the interaction, not a real capture. Labelled as such in the README.
  */
+import { initials } from './workspace';
 
 /** A screen event that causes exactly one card. Never a queue, never a log. */
 export type Trigger =
@@ -30,12 +31,23 @@ export type Trigger =
       why: string;
     }
   | {
-      kind: 'meet' | 'slack' | 'mail';
+      kind: 'meet' | 'slack' | 'mail' | 'cursor';
       /** Bold line in the alert: a window title, or who it is from. */
       heading: string;
       /** The one preview line under it. */
       preview: string;
       /** Full right side of the card eyebrow, e.g. "Slack · Morgan". */
+      eyebrow: string;
+      why: string;
+    }
+  | {
+      kind: 'email';
+      /** Sender name — the notification leads with them, avatar and all. */
+      from: string;
+      /** The email's subject, set bold under the sender. */
+      subject: string;
+      /** The one-line body preview beneath the subject. */
+      preview: string;
       eyebrow: string;
       why: string;
     };
@@ -62,6 +74,10 @@ const SLACK_GLYPH = `<span class="sys-glyph sys-glyph--slack" aria-hidden="true"
 
 const MAIL_GLYPH = `<span class="sys-glyph sys-glyph--mail" aria-hidden="true">
   <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2.5" fill="#fff"/><path d="M4.5 8 12 13l7.5-5" fill="none" stroke="#2b7fd4" stroke-width="1.6"/></svg>
+</span>`;
+
+const CURSOR_GLYPH = `<span class="sys-glyph sys-glyph--cursor" aria-hidden="true">
+  <svg viewBox="0 0 24 24"><path fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M6.5 4.5h4M6.5 19.5h4M8.5 4.5v15"/><path fill="#fff" d="m13.4 7.3 6.1 3.3-2.5.8 1.7 3-1.7 1-1.7-3-1.9 1.8Z"/></svg>
 </span>`;
 
 /* ---------------------------------------------------------------------- *
@@ -92,23 +108,32 @@ export function buildAlert(trigger: Trigger, day: number): HTMLElement {
     return alert;
   }
 
-  const glyph =
-    trigger.kind === 'meet' ? MEET_GLYPH : trigger.kind === 'slack' ? SLACK_GLYPH : MAIL_GLYPH;
-  const app = trigger.kind === 'meet' ? 'Meet' : trigger.kind === 'slack' ? 'Slack' : 'Mail';
-
-  // Meet reads as a pre-join window: a preview tile and a join control.
-  if (trigger.kind === 'meet') {
+  // Mail leads with the sender, avatar and all — a message, not just an app ping.
+  if (trigger.kind === 'email') {
     alert.innerHTML = `
-      ${glyph}
+      <span class="sys-ava" aria-hidden="true">${initials(trigger.from)}</span>
       <div class="sys-body">
-        <p class="sys-app">${app}<span class="sys-now">now</span></p>
-        <p class="sys-title">${trigger.heading}</p>
+        <p class="sys-app">Mail<span class="sys-now">now</span></p>
+        <p class="sys-title">${trigger.from}<span class="sys-unread" aria-hidden="true"></span></p>
+        <p class="sys-subject">${trigger.subject}</p>
         <p class="sys-sub">${trigger.preview}</p>
-        <span class="sys-join">Join</span>
       </div>
     `;
     return alert;
   }
+
+  const GLYPHS = { meet: MEET_GLYPH, slack: SLACK_GLYPH, mail: MAIL_GLYPH, cursor: CURSOR_GLYPH };
+  const APPS = { meet: 'Meet', slack: 'Slack', mail: 'Mail', cursor: 'Cursor' };
+  const glyph = GLYPHS[trigger.kind];
+  const app = APPS[trigger.kind];
+
+  // Meet is a pre-join window; Cursor an agent run — each ends in an action pill.
+  const pill =
+    trigger.kind === 'meet'
+      ? '<span class="sys-join">Join</span>'
+      : trigger.kind === 'cursor'
+        ? '<span class="sys-review">Review</span>'
+        : '';
 
   alert.innerHTML = `
     ${glyph}
@@ -116,6 +141,7 @@ export function buildAlert(trigger: Trigger, day: number): HTMLElement {
       <p class="sys-app">${app}<span class="sys-now">now</span></p>
       <p class="sys-title">${trigger.heading}</p>
       <p class="sys-sub">${trigger.preview}</p>
+      ${pill}
     </div>
   `;
   return alert;

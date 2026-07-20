@@ -100,6 +100,7 @@ const APP_SLUG: Record<string, string> = {
   Browser: 'web',
   Figma: 'figma',
   Pages: 'doc',
+  Cursor: 'cursor',
   'Code review': 'code',
 };
 
@@ -197,6 +198,19 @@ function mockScreen(screen: ScreenCapture): string {
 
   if (screen.app === 'Code review') {
     return `<div class="mk mk-code">${d.map((l, i) => `<span class="mk-code-l mk-code-${i % 3 === 2 ? 'add' : 'ctx'}">${l}</span>`).join('')}</div>`;
+  }
+
+  if (screen.app === 'Cursor') {
+    // A code editor: filename tab, a gutter of lines, one highlighted change.
+    const body = d
+      .slice(1)
+      .map((l, i) => `<span class="mk-cur-l${i === 0 ? ' mk-cur-add' : ''}">${l}</span>`)
+      .join('');
+    return `
+      <div class="mk mk-cursor">
+        <div class="mk-cur-tab">${line(0)}</div>
+        <div class="mk-cur-code">${body}</div>
+      </div>`;
   }
 
   // Pages and any document-like app.

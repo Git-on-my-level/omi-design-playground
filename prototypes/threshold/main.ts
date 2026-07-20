@@ -87,8 +87,17 @@ interface Brief {
   receipt: Array<{ speaker: string; text: string }>;
 }
 
-/** The commitment this card exists to surface. */
-function openCommitment(person: Person, snapshot: OmiSnapshot): SuggestedAction | undefined {
+/**
+ * The commitment this card exists to surface. Most triggers derive it from the
+ * person (their first open action that names them); a few name the action id
+ * directly, for commitments the person owns without being named in the title.
+ */
+function openCommitment(
+  person: Person,
+  snapshot: OmiSnapshot,
+  actionId?: string,
+): SuggestedAction | undefined {
+  if (actionId) return snapshot.actions.find((action) => action.id === actionId);
   const name = firstName(person);
   return snapshot.actions.find(
     (action) => action.status === 'open' && action.title.includes(name) && action.conversationId,
@@ -108,8 +117,8 @@ function contextMemory(person: Person, snapshot: OmiSnapshot): Memory | undefine
   )[0];
 }
 
-function buildBrief(person: Person, snapshot: OmiSnapshot): Brief | undefined {
-  const commitment = openCommitment(person, snapshot);
+function buildBrief(person: Person, snapshot: OmiSnapshot, actionId?: string): Brief | undefined {
+  const commitment = openCommitment(person, snapshot, actionId);
   if (!commitment) return undefined;
 
   const source: Conversation | undefined = snapshot.conversations.find(
@@ -160,50 +169,105 @@ interface ScreenEvent {
   trigger: Trigger;
 }
 
-const TRIGGERS: Record<string, Trigger> = {
-  'person-priya': {
-    kind: 'calendar',
-    event: 'Sync with Priya Shah',
-    where: 'Video call',
-    leadSeconds: LEAD_SECONDS,
-    eyebrow: 'Calendar',
-    why: 'Because your sync with Priya is in 4 minutes.',
-  },
-  'person-taylor': {
-    kind: 'meet',
-    heading: 'Export pilot review',
-    preview: 'Taylor Reed is in the call',
-    eyebrow: 'Meet · joining now',
-    why: 'Because the export pilot review just started.',
-  },
-  'person-morgan': {
-    kind: 'slack',
-    heading: 'Morgan Ellis',
-    preview: 'Did the workaround pattern hold up?',
-    eyebrow: 'Slack · Morgan',
-    why: 'Because Morgan just messaged you.',
-  },
-  'person-quinn': {
-    kind: 'mail',
-    heading: 'Quinn Ellis',
-    preview: 'Re: the next practice-sharing call',
-    eyebrow: 'Mail · Quinn',
-    why: 'Because Quinn replied about the practice-sharing call.',
-  },
+/** The app whose captured screens belong to each trigger's handoff. */
+const HANDOFF_APP: Record<Trigger['kind'], string> = {
+  calendar: 'Mail',
+  meet: 'Meet',
+  slack: 'Slack',
+  mail: 'Mail',
+  cursor: 'Cursor',
+  email: 'Mail',
 };
 
-/** The order cards arrive in. Priya leads: a calendar sync is the clearest case. */
-const TRIGGER_ORDER = ['person-priya', 'person-taylor', 'person-morgan', 'person-quinn'];
+/**
+ * The screen events, in the order they arrive. Priya leads: a calendar sync is
+ * the clearest case. Most bind to a person and let the brief resolve from the
+ * action that names them; the Cursor and mail events name their action directly,
+ * because the commitment they surface is owned by the person without their name
+ * being in the title (see `ACTION_OWNER` in workspace.ts).
+ */
+interface TriggerSpec {
+  personId: string;
+  /** Names the commitment when the action's title does not name the person. */
+  actionId?: string;
+  trigger: Trigger;
+}
+
+const TRIGGER_SPECS: TriggerSpec[] = [
+  {
+    personId: 'person-priya',
+    trigger: {
+      kind: 'calendar',
+      event: 'Sync with Priya Shah',
+      where: 'Video call',
+      leadSeconds: LEAD_SECONDS,
+      eyebrow: 'Calendar',
+      why: 'Because your sync with Priya is in 4 minutes.',
+    },
+  },
+  {
+    personId: 'person-taylor',
+    trigger: {
+      kind: 'meet',
+      heading: 'Export pilot review',
+      preview: 'Taylor Reed is in the call',
+      eyebrow: 'Meet · joining now',
+      why: 'Because the export pilot review just started.',
+    },
+  },
+  {
+    personId: 'person-avery',
+    actionId: 'action-011',
+    trigger: {
+      kind: 'cursor',
+      heading: 'Agent finished · thread-first',
+      preview: 'Progressive map reveal is ready to review',
+      eyebrow: 'Cursor · agent done',
+      why: 'Because the thread-first prototype just finished building.',
+    },
+  },
+  {
+    personId: 'person-morgan',
+    trigger: {
+      kind: 'slack',
+      heading: 'Morgan Ellis',
+      preview: 'Did the workaround pattern hold up?',
+      eyebrow: 'Slack · Morgan',
+      why: 'Because Morgan just messaged you.',
+    },
+  },
+  {
+    personId: 'person-casey',
+    actionId: 'action-012',
+    trigger: {
+      kind: 'email',
+      from: 'Casey Nguyen',
+      subject: 'The filter part arrived',
+      preview: 'Want me to swap it this week like we said?',
+      eyebrow: 'Mail · Casey',
+      why: 'Because Casey emailed that the filter part arrived.',
+    },
+  },
+  {
+    personId: 'person-quinn',
+    trigger: {
+      kind: 'mail',
+      heading: 'Quinn Ellis',
+      preview: 'Re: the next practice-sharing call',
+      eyebrow: 'Mail · Quinn',
+      why: 'Because Quinn replied about the practice-sharing call.',
+    },
+  },
+];
 
 /** Each on-screen event, paired with the card it will cause. */
 function screenEvents(snapshot: OmiSnapshot): ScreenEvent[] {
   const events: ScreenEvent[] = [];
-  for (const id of TRIGGER_ORDER) {
-    const person = snapshot.people.find((p) => p.id === id);
-    const trigger = TRIGGERS[id];
-    if (!person || !trigger) continue;
-    const brief = buildBrief(person, snapshot);
-    if (brief) events.push({ brief, trigger });
+  for (const spec of TRIGGER_SPECS) {
+    const person = snapshot.people.find((p) => p.id === spec.personId);
+    if (!person) continue;
+    const brief = buildBrief(person, snapshot, spec.actionId);
+    if (brief) events.push({ brief, trigger: spec.trigger });
   }
   return events;
 }
@@ -449,9 +513,9 @@ function showCard(brief: Brief, trigger: Trigger): void {
       workspace,
       focusPersonId: brief.person.id,
       asking,
-      // Calendar sync → Mail draft; the other triggers name their own app.
-      contextApp:
-        trigger.kind === 'calendar' ? 'Mail' : trigger.kind === 'meet' ? 'Meet' : trigger.kind === 'slack' ? 'Slack' : 'Mail',
+      // The app whose screens belong to this handoff. Calendar sync → Mail draft;
+      // the others name the app they were seen in.
+      contextApp: HANDOFF_APP[trigger.kind],
       onClose: () => {
         chat = undefined;
         // The moment is over either way. Threshold does not resume a card.

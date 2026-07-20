@@ -75,6 +75,20 @@ const GOAL_DEFINITIONS: GoalDefinition[] = [
   },
 ];
 
+/*
+ * Ownership for actions whose title does not name a person, but whose source
+ * conversation makes the owner unambiguous. Keyed by action id → person id. This
+ * is the one place a task's person is asserted rather than read from its title,
+ * so the two extra screen-triggered cards (Avery's prototype, Casey's filter)
+ * open on a person whose task list actually contains the commitment. Both are
+ * backed by a line in the transcript: Casey offers to take the filter swap, and
+ * Avery drives the thread-first prototype in the design studio.
+ */
+const ACTION_OWNER: Record<string, string> = {
+  'action-011': 'person-avery',
+  'action-012': 'person-casey',
+};
+
 /**
  * A screen Omi says it saw while a task was moving. Fabricated: the fixture has
  * no screenshots and nothing here captures a real screen. These are rendered as
@@ -275,27 +289,55 @@ const SCREEN_CAPTURES: Record<string, ScreenCapture[]> = {
       ],
     },
   ],
+  // Avery · Cursor agent building the thread-first prototype.
   'action-011': [
     {
-      app: 'Figma',
-      caption: 'Thread-first prototype frame',
+      app: 'Cursor',
+      caption: 'Agent started · thread-first',
       at: '1:33 PM',
       state: 'opened',
-      detail: ['Thread-first', 'Map · progressive reveal'],
+      detail: ['thread-first.tsx', 'Composer: progressive map reveal', 'Planning the reveal on expand'],
     },
     {
-      app: 'Figma',
-      caption: 'Added expand affordance',
+      app: 'Cursor',
+      caption: 'Wrote the expand affordance',
       at: '1:58 PM',
       state: 'progress',
-      detail: ['Thread-first', 'Expand · one level', 'Calm first view'],
+      detail: ['thread-first.tsx', '+ reveal map on expand', 'Calm first view, map on demand'],
     },
     {
-      app: 'Figma',
-      caption: 'Progressive map reveal',
+      app: 'Cursor',
+      caption: 'Build passed · shared with Avery',
       at: '2:15 PM',
-      state: 'progress',
-      detail: ['Thread-first', 'Reveal on expand', 'Shared with Avery'],
+      state: 'done',
+      detail: ['thread-first.tsx', 'Build passed · 0 errors', 'Sent the preview to Avery for review'],
+    },
+  ],
+  // Casey · Mail thread about the home-filter swap.
+  'action-012': [
+    {
+      app: 'Mail',
+      caption: 'Casey — the filter part arrived',
+      at: '9:04 AM',
+      state: 'opened',
+      detail: [
+        'From: Casey Nguyen',
+        'Subject: The filter part arrived',
+        'Casey —',
+        'Want me to swap it this week like we said?',
+      ],
+    },
+    {
+      app: 'Mail',
+      caption: 'Confirmed the swap with Casey',
+      at: '9:20 AM',
+      state: 'done',
+      detail: [
+        'To: Casey Nguyen',
+        'Subject: Re: The filter part arrived',
+        'Sent',
+        'Thursday works — thanks for grabbing the part.',
+      ],
     },
   ],
   'action-007': [
@@ -470,8 +512,12 @@ export function buildWorkspace(snapshot: OmiSnapshot): Workspace {
    * longer match.
    */
   const byFirstName = [...others].sort((a, b) => firstName(b).length - firstName(a).length);
-  const personInTitle = (title: string): Person | undefined =>
-    byFirstName.find((person) => title.includes(firstName(person)));
+  const personById = new Map(others.map((person) => [person.id, person]));
+  const ownerOf = (action: SuggestedAction): Person | undefined => {
+    const owned = ACTION_OWNER[action.id];
+    if (owned) return personById.get(owned);
+    return byFirstName.find((person) => action.title.includes(firstName(person)));
+  };
 
   const goals: GoalView[] = [];
   const tasks: TaskView[] = [];
@@ -500,7 +546,7 @@ export function buildWorkspace(snapshot: OmiSnapshot): Workspace {
       const task: TaskView = {
         action,
         goal,
-        person: personInTitle(action.title),
+        person: ownerOf(action),
         source: action.conversationId ? conversationById.get(action.conversationId) : undefined,
         dueLabel: dueLabel(action.dueAt),
         overdue: action.status === 'open' && action.dueAt !== undefined && new Date(action.dueAt) < FIXTURE_NOW,

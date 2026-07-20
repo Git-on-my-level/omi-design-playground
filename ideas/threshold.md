@@ -25,8 +25,9 @@ just happened, and the card arrives *because of* it:
 - A **calendar alert** slides in — native system chrome, solid, unmistakably the OS and not
   Omi — for a meeting that is close. A beat later the card arrives, its countdown descending
   from the alert's time.
-- Or a **known person's context comes to the foreground**: a Meet pre-join, a Slack DM, a
-  mail reply. When it is someone Omi knows, the card arrives; when it is not, nothing does.
+- Or a **known person's context comes to the foreground**: a Meet pre-join, a finished Cursor
+  agent run, a Slack DM, an email, a mail reply. When it is someone Omi knows, the card arrives;
+  when it is not, nothing does.
 
 The card names the source in its eyebrow (`Calendar · in 4 min`, `Slack · Morgan`) and carries
 one dim **"why now"** line naming the signal — *"Because your sync with Priya is in 4 minutes."*
@@ -62,7 +63,7 @@ The app behind the door has one substrate and two lenses. **Tasks are the only o
 
 That is the correction that made it simple. The first build gave people their own expanded page: open items, goals, memories, conversation history, four stacked sections. It was a CRM record sitting next to a task tracker, and the two disagreed about which object was primary. Making a person a *lens* answers it — the commitment is primary, and a person is a question you ask about it. Memory survives as a compact context block in the lens header, which is the right size for it: it is what you need to know before you act on the list below, not a page to browse.
 
-Goals are derived from the conversations their commitments came out of, which is the only structure the fixture can honestly support. And every task can unfold its receipt — the verbatim line that produced it, with a **View conversation** link into the full transcript on its own **Conversations** page: *why believe this*. Tasks Omi also watched carry a tiny **screen-capture preview** in the row's tail that does not grow the row; click it and it opens the **Rewind** tab on that trail, tracking a task from *opened* through *in progress* to *done* — *how far along*. Rewind draws each capture as the app it was seen in — a mail message, a Slack thread, a Meet stage — so it reads as a screenshot, not a transcript. Those two ingresses are a deliberate pair, and both live behind the handoff door where browsing is the point; the card and the row stay a single glance. That pairing — why believe this, and how far along — is the part no other tracker can copy.
+Goals are derived from the conversations their commitments came out of, which is the only structure the fixture can honestly support. And every task can unfold its receipt — the verbatim line that produced it, with a **View conversation** link into the full transcript on its own **Conversations** page: *why believe this*. Tasks Omi also watched carry a tiny **screen-capture preview** in the row's tail that does not grow the row; click it and it opens the **Rewind** tab on that trail, tracking a task from *opened* through *in progress* to *done* — *how far along*. Rewind draws each capture as the app it was seen in — a mail message, a Slack thread, a Meet stage, a Cursor editor — so it reads as a screenshot, not a transcript. Those two ingresses are a deliberate pair, and both live behind the handoff door where browsing is the point; the card and the row stay a single glance. That pairing — why believe this, and how far along — is the part no other tracker can copy.
 
 That density is exactly what the card must never become. The card is one fact; the app is the whole graph. Keeping them in one prototype is deliberate — it is the argument that an interruption earns its place by being *narrower* than the thing it can open, not by being a smaller copy of it.
 

@@ -638,8 +638,13 @@ body {
 .sys-glyph--mail {
   background: linear-gradient(160deg, #6cc6f7, #2b7fd4);
 }
+.sys-glyph--cursor {
+  background: linear-gradient(160deg, #2b2b30, #101014);
+  box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.12) inset;
+}
 
-.sys-join {
+.sys-join,
+.sys-review {
   display: inline-block;
   margin-top: 9px;
   padding: 5px 15px;
@@ -648,6 +653,53 @@ body {
   font-weight: 600;
   color: #fff;
   background: #00832d;
+}
+
+/* Cursor's action reads as a review affordance, not a call to join. */
+.sys-review {
+  color: #1c1b1f;
+  background: rgba(0, 0, 0, 0.07);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.12) inset;
+}
+
+/* Mail leads with the sender: an avatar, the subject in bold, an unread dot. */
+.sys-ava {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: linear-gradient(160deg, #6cc6f7, #2b7fd4);
+}
+
+.sys--email .sys-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sys-unread {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: #2b7fd4;
+}
+
+.sys-subject {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #1c1b1f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---- omi window -------------------------------------------------------- */
@@ -2071,6 +2123,49 @@ body {
 }
 
 .mk-code-add {
+  color: #8fe0a0;
+  background: rgba(123, 201, 138, 0.1);
+  border-left: 2px solid #7bc98a;
+  padding-left: 6px;
+}
+
+/* Cursor: a code editor — filename tab, mono lines, one highlighted change. */
+.mk-cursor {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+  background: #14161a;
+}
+
+.mk-cur-tab {
+  padding: 4px 8px;
+  font-size: 7.5px;
+  color: rgba(245, 239, 230, 0.72);
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mk-cur-code {
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  align-content: start;
+  font-family: 'SF Mono', ui-monospace, monospace;
+  font-size: 7.5px;
+  color: rgba(245, 239, 230, 0.5);
+}
+
+.mk-cur-l {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 8px;
+}
+
+.mk-cur-add {
   color: #8fe0a0;
   background: rgba(123, 201, 138, 0.1);
   border-left: 2px solid #7bc98a;
