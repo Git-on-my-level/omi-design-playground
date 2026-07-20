@@ -40,13 +40,14 @@ Ranked by conviction per hour.
 pieces of shared infrastructure the rest of these can use: `_macos-stage` (desktop bezel) and
 `_voice` (mic level + push-to-talk, no UI).
 
+**Ledger is built** — see [prototypes/ledger](../prototypes/ledger).
+
 Remaining:
 
-1. **Ledger** — the reframe does the work, the data is already in `SuggestedAction`, and the visual register alone makes it read as a different product.
-2. **Filament** — small surface, but all the effort lands in motion craft. Cheap to build, expensive to imitate.
-3. **Live Margin** — strongest single demo moment (the revision), but needs a fake macOS desktop and a hand-timed script.
-4. **Field** — highest ceiling, highest risk. Only worth it if drag-to-connect gets built first.
-5. **Mirror** — most content-dependent; its quality is mostly copywriting, and the Quiet section has a real tone hazard.
+1. **Filament** — small surface, but all the effort lands in motion craft. Cheap to build, expensive to imitate.
+2. **Live Margin** — strongest single demo moment (the revision), but needs a fake macOS desktop and a hand-timed script.
+3. **Field** — highest ceiling, highest risk. Only worth it if drag-to-connect gets built first.
+4. **Mirror** — most content-dependent; its quality is mostly copywriting, and the Quiet section has a real tone hazard.
 
 ## Cut
 
