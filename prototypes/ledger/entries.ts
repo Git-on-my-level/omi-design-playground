@@ -1,6 +1,7 @@
 /**
  * Map Omi fixtures into ledger entries.
- * Debit/credit side is not in the SDK — derived + a few fabricated credits.
+ * An entry posts to a person, a goal, or both. Debit/credit side and goals
+ * are not in the SDK — derived from fixture clusters + a few fabricated credits.
  */
 import type {
   Conversation,
@@ -12,32 +13,68 @@ import type {
 
 export type Side = 'debit' | 'credit';
 
+export interface Goal {
+  id: string;
+  name: string;
+}
+
+/** A frame Omi caught on screen — the visual twin of a transcript receipt. */
+export interface Shot {
+  app: string;
+  context: string;
+  lines: string[];
+  at: string;
+}
+
 export interface LedgerEntry {
   id: string;
   date: Date;
   dateLabel: string;
-  personId: string;
-  personName: string;
+  personId: string | null;
+  personName: string | null;
+  goalId: string | null;
+  goalName: string | null;
   commitment: string;
   ageDays: number;
   side: Side;
   settled: boolean;
   receipt: string | null;
+  shot: Shot | null;
+  conversationId: string | null;
+  receiptSegmentId: string | null;
 }
 
 export const FIXTURE_NOW = new Date('2026-07-20T18:16:00.000Z');
 
-/** Open actions that name someone you owe — the ledger's debit spine. */
-const DEBIT_BY_ACTION: Record<string, { personId: string; commitment: string }> = {
-  'action-001': { personId: 'person-priya', commitment: 'Send the workshop decision trail' },
-  'action-002': { personId: 'person-taylor', commitment: 'Confirm the narrow export pilot' },
-  'action-006': { personId: 'person-morgan', commitment: 'Ask about the repeated workaround pattern' },
+export const GOALS: Goal[] = [
+  { id: 'goal-pilot', name: 'Ship the narrow pilot' },
+  { id: 'goal-roadmap', name: 'Evidence-first roadmap' },
+  { id: 'goal-trip', name: 'Calm-arrival trip' },
+  { id: 'goal-home', name: 'Home upkeep' },
+];
+
+interface ActionMeta {
+  personId?: string;
+  goalId?: string;
+  commitment: string;
+}
+
+/** Actions posted to the book — each names a counterparty, a goal, or both. */
+const ACTION_META: Record<string, ActionMeta> = {
+  'action-001': { personId: 'person-priya', goalId: 'goal-pilot', commitment: 'Send the workshop decision trail' },
+  'action-002': { personId: 'person-taylor', goalId: 'goal-pilot', commitment: 'Confirm the narrow export pilot' },
+  'action-016': { personId: 'person-avery', goalId: 'goal-pilot', commitment: 'Write what the pilot does not solve' },
+  'action-011': { personId: 'person-avery', goalId: 'goal-pilot', commitment: 'Try a thread-first prototype with map reveal' },
+  'action-005': { personId: 'person-avery', goalId: 'goal-pilot', commitment: 'Share the smallest useful slice outline' },
+  'action-006': { personId: 'person-morgan', goalId: 'goal-roadmap', commitment: 'Ask about the repeated workaround pattern' },
+  'action-007': { personId: 'person-taylor', goalId: 'goal-roadmap', commitment: 'Review evidence links before roadmap' },
+  'action-003': { goalId: 'goal-roadmap', commitment: 'Add the unresolved workshop question to the agenda' },
+  'action-009': { personId: 'person-robin', goalId: 'goal-trip', commitment: 'Keep an arrival buffer in the itinerary' },
+  'action-019': { goalId: 'goal-trip', commitment: 'Check battery and sync before leaving' },
+  'action-010': { goalId: 'goal-trip', commitment: 'Pack the small recorder' },
+  'action-012': { goalId: 'goal-home', commitment: 'Replace the home filter when the part arrives' },
+  'action-013': { goalId: 'goal-home', commitment: 'Keep the maintenance list to three items' },
   'action-014': { personId: 'person-quinn', commitment: 'Invite to the next practice-sharing call' },
-  'action-005': { personId: 'person-avery', commitment: 'Share the smallest useful slice outline' },
-  'action-016': { personId: 'person-avery', commitment: 'Write what the pilot does not solve' },
-  'action-007': { personId: 'person-taylor', commitment: 'Review evidence links before roadmap' },
-  'action-011': { personId: 'person-avery', commitment: 'Try a thread-first prototype with map reveal' },
-  'action-009': { personId: 'person-robin', commitment: 'Keep an arrival buffer in the itinerary' },
 };
 
 /**
@@ -47,6 +84,7 @@ const DEBIT_BY_ACTION: Record<string, { personId: string; commitment: string }> 
 const FABRICATED_CREDITS: Array<{
   id: string;
   personId: string;
+  goalId?: string;
   commitment: string;
   conversationId: string;
   segmentId: string;
@@ -56,6 +94,7 @@ const FABRICATED_CREDITS: Array<{
   {
     id: 'credit-casey-filter',
     personId: 'person-casey',
+    goalId: 'goal-home',
     commitment: 'Take the filter replacement when the part arrives',
     conversationId: 'conv-0718-home-admin',
     segmentId: 'seg-0718-6',
@@ -65,6 +104,7 @@ const FABRICATED_CREDITS: Array<{
   {
     id: 'credit-taylor-export',
     personId: 'person-taylor',
+    goalId: 'goal-pilot',
     commitment: 'Instrument the review path before a bigger surface',
     conversationId: 'conv-0716-roadmap-workshop',
     segmentId: 'seg-0716-2',
@@ -74,6 +114,7 @@ const FABRICATED_CREDITS: Array<{
   {
     id: 'credit-avery-edges',
     personId: 'person-avery',
+    goalId: 'goal-pilot',
     commitment: 'Show unresolved edges instead of a complete graph',
     conversationId: 'conv-0718-design-studio',
     segmentId: 'seg-0718-4',
@@ -91,8 +132,131 @@ const FABRICATED_CREDITS: Array<{
   },
 ];
 
-function personById(people: Person[], id: string): Person | undefined {
-  return people.find((p) => p.id === id);
+/**
+ * Screen captures — obligations Omi caught on screen, never said aloud.
+ * The SDK has no screen frames; these are fabricated, and the receipt is the
+ * captured region (a Shot) rather than a transcript quote.
+ */
+const SCREEN_CAPTURES: Array<{
+  id: string;
+  personId?: string;
+  goalId?: string;
+  commitment: string;
+  side: Side;
+  date: string;
+  settled: boolean;
+  shot: Shot;
+}> = [
+  {
+    id: 'screen-priya-deck',
+    personId: 'person-priya',
+    goalId: 'goal-pilot',
+    commitment: 'Send the pricing deck before the Thursday sync',
+    side: 'debit',
+    date: '2026-07-19T14:47:00.000Z',
+    settled: false,
+    shot: {
+      app: 'Slack',
+      context: '#pilot-launch · Priya Shah',
+      lines: ['Can you drop the pricing deck in here before Thursday’s sync? Want to read it first.'],
+      at: '2:47 PM',
+    },
+  },
+  {
+    id: 'screen-morgan-notes',
+    personId: 'person-morgan',
+    goalId: 'goal-roadmap',
+    commitment: 'Share the interview notes from the workaround study',
+    side: 'credit',
+    date: '2026-07-19T09:12:00.000Z',
+    settled: false,
+    shot: {
+      app: 'Slack',
+      context: 'DM · Morgan Ellis',
+      lines: ['I’ll get you the interview notes from the workaround study by Monday.'],
+      at: '9:12 AM',
+    },
+  },
+];
+
+/** Ambient captures for Rewind — seen on screen, not posted as obligations. */
+const REWIND_AMBIENT: Array<{ id: string; date: string; shot: Shot }> = [
+  {
+    id: 'rewind-calendar',
+    date: '2026-07-20T11:05:00.000Z',
+    shot: {
+      app: 'Calendar',
+      context: 'Pilot sync · Thursday 2:00 PM',
+      lines: ['Pricing deck review', 'Attendees: Priya Shah, Taylor Reed, Riley Park'],
+      at: '11:05 AM',
+    },
+  },
+  {
+    id: 'rewind-notes',
+    date: '2026-07-20T10:22:00.000Z',
+    shot: {
+      app: 'Notes',
+      context: 'Interview themes',
+      lines: ['Repeated workaround pattern — three teams, same edge case.', 'Ask Morgan what they tried first.'],
+      at: '10:22 AM',
+    },
+  },
+  {
+    id: 'rewind-mail',
+    date: '2026-07-19T16:40:00.000Z',
+    shot: {
+      app: 'Mail',
+      context: 'Casey Okonkwo · Re: filter handoff',
+      lines: ['Filter lands Friday. I’ll ping you when the PR is up.'],
+      at: '4:40 PM',
+    },
+  },
+];
+
+export interface RewindFrame {
+  id: string;
+  entryId: string | null;
+  commitment: string | null;
+  personName: string | null;
+  date: Date;
+  dateLabel: string;
+  shot: Shot;
+}
+
+/** Every screen capture, newest first — Rewind scrubs backward through time. */
+export function listRewindFrames(entries: LedgerEntry[]): RewindFrame[] {
+  const fromEntries = entries
+    .filter((e) => e.shot)
+    .map((e) => ({
+      id: e.id,
+      entryId: e.id,
+      commitment: e.commitment,
+      personName: e.personName,
+      date: e.date,
+      dateLabel: e.dateLabel,
+      shot: e.shot!,
+    }));
+  const ambient = REWIND_AMBIENT.map((f) => {
+    const date = new Date(f.date);
+    return {
+      id: f.id,
+      entryId: null,
+      commitment: null,
+      personName: null,
+      date,
+      dateLabel: formatDate(date),
+      shot: f.shot,
+    };
+  });
+  return [...fromEntries, ...ambient].sort((a, b) => b.date.getTime() - a.date.getTime());
+}
+
+function personById(people: Person[], id?: string): Person | undefined {
+  return id ? people.find((p) => p.id === id) : undefined;
+}
+
+function goalById(id?: string): Goal | undefined {
+  return id ? GOALS.find((g) => g.id === id) : undefined;
 }
 
 function convById(conversations: Conversation[], id?: string): Conversation | undefined {
@@ -110,7 +274,7 @@ function formatDate(d: Date): string {
 }
 
 /** Prefer a non-Riley segment that mentions the commitment, else any non-Riley, else first. */
-function pickReceipt(conv: Conversation | undefined, commitment: string): string | null {
+function pickReceiptSegment(conv: Conversation | undefined, commitment: string): TranscriptSegment | null {
   if (!conv?.segments.length) return null;
   const lower = commitment.toLowerCase();
   const keywords = lower
@@ -125,7 +289,7 @@ function pickReceipt(conv: Conversation | undefined, commitment: string): string
     return { seg, score };
   });
   scored.sort((a, b) => b.score - a.score);
-  return quote(scored[0]!.seg);
+  return scored[0]!.seg;
 }
 
 function segmentById(conv: Conversation | undefined, id: string): TranscriptSegment | undefined {
@@ -138,24 +302,31 @@ function quote(seg: TranscriptSegment): string {
 
 function fromAction(
   action: SuggestedAction,
-  meta: { personId: string; commitment: string },
+  meta: ActionMeta,
   snapshot: OmiSnapshot,
 ): LedgerEntry | null {
   const person = personById(snapshot.people, meta.personId);
-  if (!person) return null;
+  const goal = goalById(meta.goalId);
+  if (!person && !goal) return null;
   const conv = convById(snapshot.conversations, action.conversationId);
   const date = conv ? new Date(conv.startedAt) : action.dueAt ? new Date(action.dueAt) : FIXTURE_NOW;
+  const seg = pickReceiptSegment(conv, meta.commitment);
   return {
     id: action.id,
     date,
     dateLabel: formatDate(date),
-    personId: person.id,
-    personName: person.name.split(' ')[0]!,
+    personId: person?.id ?? null,
+    personName: person ? person.name.split(' ')[0]! : null,
+    goalId: goal?.id ?? null,
+    goalName: goal?.name ?? null,
     commitment: meta.commitment,
     ageDays: ageDays(date),
     side: 'debit',
     settled: action.status === 'done',
-    receipt: pickReceipt(conv, meta.commitment),
+    receipt: seg ? quote(seg) : null,
+    shot: null,
+    conversationId: conv?.id ?? null,
+    receiptSegmentId: seg?.id ?? null,
   };
 }
 
@@ -163,7 +334,7 @@ export function buildEntries(snapshot: OmiSnapshot): LedgerEntry[] {
   const byId = new Map(snapshot.actions.map((a) => [a.id, a]));
   const entries: LedgerEntry[] = [];
 
-  for (const [actionId, meta] of Object.entries(DEBIT_BY_ACTION)) {
+  for (const [actionId, meta] of Object.entries(ACTION_META)) {
     const action = byId.get(actionId);
     if (!action) continue;
     const entry = fromAction(action, meta, snapshot);
@@ -173,8 +344,9 @@ export function buildEntries(snapshot: OmiSnapshot): LedgerEntry[] {
   for (const credit of FABRICATED_CREDITS) {
     const person = personById(snapshot.people, credit.personId);
     if (!person) continue;
+    const goal = goalById(credit.goalId);
     const conv = convById(snapshot.conversations, credit.conversationId);
-    const seg = segmentById(conv, credit.segmentId);
+    const seg = segmentById(conv, credit.segmentId) ?? pickReceiptSegment(conv, credit.commitment);
     const date = new Date(credit.date);
     entries.push({
       id: credit.id,
@@ -182,11 +354,40 @@ export function buildEntries(snapshot: OmiSnapshot): LedgerEntry[] {
       dateLabel: formatDate(date),
       personId: person.id,
       personName: person.name.split(' ')[0]!,
+      goalId: goal?.id ?? null,
+      goalName: goal?.name ?? null,
       commitment: credit.commitment,
       ageDays: ageDays(date),
       side: 'credit',
       settled: credit.settled,
-      receipt: seg ? quote(seg) : pickReceipt(conv, credit.commitment),
+      receipt: seg ? quote(seg) : null,
+      shot: null,
+      conversationId: conv?.id ?? null,
+      receiptSegmentId: seg?.id ?? null,
+    });
+  }
+
+  for (const cap of SCREEN_CAPTURES) {
+    const person = personById(snapshot.people, cap.personId);
+    const goal = goalById(cap.goalId);
+    if (!person && !goal) continue;
+    const date = new Date(cap.date);
+    entries.push({
+      id: cap.id,
+      date,
+      dateLabel: formatDate(date),
+      personId: person?.id ?? null,
+      personName: person ? person.name.split(' ')[0]! : null,
+      goalId: goal?.id ?? null,
+      goalName: goal?.name ?? null,
+      commitment: cap.commitment,
+      ageDays: ageDays(date),
+      side: cap.side,
+      settled: cap.settled,
+      receipt: null,
+      shot: cap.shot,
+      conversationId: null,
+      receiptSegmentId: null,
     });
   }
 
@@ -209,23 +410,32 @@ export function balanceOf(entries: LedgerEntry[]): { owe: number; owed: number }
   return { owe, owed };
 }
 
+export type AccountKey = { kind: 'person' | 'goal'; id: string };
+
+export function entriesFor(entries: LedgerEntry[], key: AccountKey): LedgerEntry[] {
+  return entries.filter((e) => (key.kind === 'person' ? e.personId === key.id : e.goalId === key.id));
+}
+
 export function accountSubtotal(
   entries: LedgerEntry[],
-  personId: string,
+  key: AccountKey,
 ): { owe: number; owed: number; oldest: number | null } {
-  const mine = entries.filter((e) => e.personId === personId);
-  const open = mine.filter((e) => !e.settled);
+  const open = entriesFor(entries, key).filter((e) => !e.settled);
   const owe = open.filter((e) => e.side === 'debit').length;
   const owed = open.filter((e) => e.side === 'credit').length;
   const oldest = open.length ? Math.max(...open.map((e) => e.ageDays)) : null;
   return { owe, owed, oldest };
 }
 
-/** ponytail: fails if debit/credit mapping or age math regresses */
+/** ponytail: fails if debit/credit mapping, goal posting, or age math regresses */
 export function assertLedgerInvariants(entries: LedgerEntry[]): void {
   const open = entries.filter((e) => !e.settled);
   const { owe, owed } = balanceOf(entries);
   console.assert(owe + owed === open.length, 'balance counts must cover every open entry');
+  console.assert(
+    entries.every((e) => e.personId !== null || e.goalId !== null),
+    'every entry must post to a person or a goal',
+  );
   console.assert(
     entries.every((e) => e.ageDays >= 0),
     'age cannot be negative against the fixture clock',
@@ -233,6 +443,14 @@ export function assertLedgerInvariants(entries: LedgerEntry[]): void {
   console.assert(
     open.some((e) => e.side === 'credit') && open.some((e) => e.side === 'debit'),
     'ledger must show both sides of the book',
+  );
+  console.assert(
+    open.some((e) => e.goalId && !e.personId),
+    'ledger must include goal-only entries',
+  );
+  console.assert(
+    open.some((e) => e.shot !== null),
+    'ledger must include a screen-captured entry',
   );
   const ages = open.map((e) => e.ageDays);
   console.assert(
