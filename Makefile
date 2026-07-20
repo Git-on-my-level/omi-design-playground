@@ -48,9 +48,13 @@ new:
 test: install
 	cd $(PACK) && npm test
 
+.PHONY: pages
+pages: install
+	@./scripts/build-pages.sh
+
 .PHONY: clean
 clean:
-	rm -rf prototypes/*/.vite
+	rm -rf prototypes/*/.vite dist
 
 # ---------------------------------------------------------------------------
 # Serve and screenshot any prototype by name.
