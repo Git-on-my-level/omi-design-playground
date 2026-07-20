@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Omi SDK Diagnostic Harness</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p>Omi SDK diagnostic harness</p>
+        <h1>Replace this entire page with your concept.</h1>
+        <p>This is functioning local data and interaction—not a recommended layout, style, or navigation model.</p>
+        <fieldset>
+          <legend>Pass a platform into the mock capture</legend>
+          <button class="is-selected" data-platform="macos" type="button">macOS</button>
+          <button data-platform="ios" type="button">iOS</button>
+        </fieldset>
+      </header>
+
+      <section aria-live="polite">
+        <h2 id="title">Loading mock state</h2>
+        <p id="device-state"></p>
+        <dl>
+          <div>
+            <dt>Latest conversation</dt>
+            <dd><strong id="conversation-title"></strong><span id="conversation-summary"></span></dd>
+          </div>
+          <div>
+            <dt>One remembered thing</dt>
+            <dd><strong id="memory-kind"></strong><span id="memory-text"></span></dd>
+          </div>
+          <div>
+            <dt>Capture state</dt>
+            <dd><strong id="capture-state"></strong><span id="capture-detail"></span></dd>
+          </div>
+        </dl>
+        <p>
+          <button id="capture-button" type="button">Start a mock capture</button>
+          <button id="prompt-button" type="button">Ask a mock assistant</button>
+        </p>
+        <output id="response"></output>
+      </section>
+    </main>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,84 @@
+:root {
+  color: #f4f5ff;
+  background: #0b0d16;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  display: grid;
+  min-height: 100vh;
+  margin: 0;
+  place-items: center;
+  background:
+    radial-gradient(circle at 18% 18%, #5b45d755, transparent 32rem),
+    radial-gradient(circle at 82% 78%, #00bc9d38, transparent 28rem),
+    #0b0d16;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 15rem;
+  gap: clamp(2rem, 8vw, 8rem);
+  width: min(100% - 3rem, 68rem);
+  align-items: end;
+}
+
+.eyebrow {
+  margin: 0 0 1.25rem;
+  color: #a8a6ff;
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+h1 {
+  max-width: 9ch;
+  margin: 0;
+  font-size: clamp(4rem, 11vw, 8rem);
+  letter-spacing: -0.075em;
+  line-height: 0.88;
+}
+
+.lede {
+  max-width: 32rem;
+  margin: 1.7rem 0;
+  color: #c6c8d9;
+  font-size: 1.1rem;
+  line-height: 1.55;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.85rem 1.2rem;
+  color: #0b0d16;
+  background: #e9e9ff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 750;
+}
+
+button:hover { background: #c9ffec; }
+button:focus-visible { outline: 3px solid #c9ffec; outline-offset: 4px; }
+
+.response { min-height: 1.5rem; margin: 1rem 0 0; color: #aeb1c6; }
+
+.device-card {
+  padding: 1.25rem;
+  border: 1px solid #ffffff1f;
+  border-radius: 1.25rem;
+  background: #ffffff0d;
+  box-shadow: 0 1.5rem 3rem #00000026;
+}
+
+.device-card p, .device-card small { display: block; margin: 0; color: #aeb1c6; }
+.device-card strong { display: block; margin: 0.35rem 0 1.5rem; font-size: 1.15rem; }
+.status-dot { display: block; width: 0.65rem; height: 0.65rem; margin-bottom: 1rem; border-radius: 50%; background: #57e7b6; box-shadow: 0 0 1rem #57e7b6; }
+
+@media (max-width: 640px) {
+  .shell { grid-template-columns: 1fr; align-items: start; gap: 3rem; width: min(100% - 2.5rem, 34rem); padding: 3rem 0; }
+  .device-card { max-width: 18rem; }
+}

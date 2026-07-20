@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0d16" />
+    <title>Hello, Omi</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">Omi UI Hackathon · Prototype 01</p>
+        <h1 id="page-title">Hello, Omi.</h1>
+        <p class="lede">A tiny, responsive first surface—ready to become the next desktop or mobile concept.</p>
+        <button id="hello-button" type="button">Say hello</button>
+        <p id="response" class="response" aria-live="polite">Waiting for your first interaction.</p>
+      </section>
+
+      <aside class="device-card" aria-label="Mock device status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <p>Local prototype</p>
+        <strong>Ready to explore</strong>
+        <small>Responsive desktop ↔ mobile</small>
+      </aside>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

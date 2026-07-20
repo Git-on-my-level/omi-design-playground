@@ -1,0 +1,22 @@
+{
+  "name": "omi-ui-hackathon-pack",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A fakeable Omi capability SDK and HTML prototype starter for UI hackathons.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --config vitest.config.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0"
+  }
+}
