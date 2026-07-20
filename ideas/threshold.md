@@ -18,13 +18,23 @@ This is not recall. It is **readiness**.
 
 ## The demo
 
-Time-compress the calendar so a meeting is always 60 seconds out. The panel slides in over whatever is on screen. Three interactions, total:
+Time-compress the calendar so a meeting is always 60 seconds out. The panel slides in over whatever is on screen. Interactions, in order of how much they ask of you:
 
 1. **Read it.** It self-dismisses when the meeting starts.
 2. **Push it away** — a flick sends it off-screen with real momentum; it does not come back.
 3. **Pull it deeper** — drag down and the card *unfolds* one level: the source conversation that produced the claim. This is the trust move. Every fact must be able to show its receipt.
+4. **Speak to it** — hold right ⌘ and the card starts listening. The meter grows out of the footer it already had, the words land in the card, and releasing carries the question into the window. Threshold is a surface you have four minutes for; typing is the wrong instrument.
+5. **Leave** — `Open in Omi` retires the card and opens the chat window that already knows who you were looking at.
 
 If a reviewer touches nothing and still understands the product, the design worked.
+
+## The handoff
+
+Threshold must never become browsable, but it cannot be a dead end either — the answer to "so what do I do about this?" has to exist somewhere. So it exists somewhere *else*.
+
+`Open in Omi` is a **one-way door**. The card does not minimise, background, or wait; it retires, and the window inherits its context as typed cards at the top: the person as a **contact card**, the commitment as a **task card**. Those cards are the card you just dismissed, restated as objects you can act on.
+
+This is what keeps the concept honest. Threshold stays one card and one moment precisely *because* it has somewhere to hand off to.
 
 ## Design language
 
@@ -58,14 +68,23 @@ Discipline: **the ember appears once**. If two things are urgent, the card is wr
 - Unfold: 280ms height + opacity, contents stagger 40ms apart.
 - Never pulse, never breathe. Threshold is not alive; it is punctual.
 
-**Material** — 24px radius, `backdrop-filter: blur(40px) saturate(1.4)`, one soft ember-tinted shadow beneath. It sits *above* the desktop, not in a window.
+**Material** — 24px radius, one soft ember-tinted shadow beneath. It sits *above* the desktop, not in a window.
+
+The card is **real glass**: you can see the wallpaper move under it. That means the tint must stay thin (~0.3–0.42 alpha) and the backdrop must be *darkened before* the tint lands — `blur(26px) saturate(135%) brightness(0.6)`. Skipping the brightness step and thickening the tint instead produces something that merely looks like a dark card, which is the failure the translucency exists to avoid. The fact carries a soft text-shadow because the surface behind it is live.
+
+The window it hands off to is **not** glass. Windows on this desktop are solid; only things floating above the work are vibrant. That contrast is doing real work — it is how you know the card was never a window.
 
 ## Rules
 
 - No scrollbar. Ever. If it does not fit, it was not important enough.
 - No more than three facts. Three is already a compromise; two is better.
-- No buttons with labels. Gestures and self-dismissal only.
+- **Exactly one button, and it leads out.** This started as "no buttons with labels," which was
+  wrong: a surface that can only be dismissed makes you re-find everything it just told you. The
+  rule that survives is stricter and more useful — the only labelled control on the card is the
+  one that ends the card. Nothing on it may lead deeper into itself.
 - The person's name is the largest thing after the fact itself.
+- Listening owns the ember while it is happening. If the countdown is also urgent, the countdown
+  yields — two ember things is still the failure state.
 
 ## SDK hooks
 

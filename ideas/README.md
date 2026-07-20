@@ -34,14 +34,19 @@ No two share a row, and no two share a visual language. Palettes were deliberate
 
 ## Build order
 
-Ranked by conviction per hour:
+Ranked by conviction per hour.
 
-1. **Threshold** — highest idea-per-pixel ratio. It is one card; buildable in an hour and the thesis is unmistakable.
-2. **Ledger** — the reframe does the work, the data is already in `SuggestedAction`, and the visual register alone makes it read as a different product.
-3. **Filament** — small surface, but all the effort lands in motion craft. Cheap to build, expensive to imitate.
-4. **Live Margin** — strongest single demo moment (the revision), but needs a fake macOS desktop and a hand-timed script.
-5. **Field** — highest ceiling, highest risk. Only worth it if drag-to-connect gets built first.
-6. **Mirror** — most content-dependent; its quality is mostly copywriting, and the Quiet section has a real tone hazard.
+**Threshold is built** — see [prototypes/threshold](../prototypes/threshold). It also produced two
+pieces of shared infrastructure the rest of these can use: `_macos-stage` (desktop bezel) and
+`_voice` (mic level + push-to-talk, no UI).
+
+Remaining:
+
+1. **Ledger** — the reframe does the work, the data is already in `SuggestedAction`, and the visual register alone makes it read as a different product.
+2. **Filament** — small surface, but all the effort lands in motion craft. Cheap to build, expensive to imitate.
+3. **Live Margin** — strongest single demo moment (the revision), but needs a fake macOS desktop and a hand-timed script.
+4. **Field** — highest ceiling, highest risk. Only worth it if drag-to-connect gets built first.
+5. **Mirror** — most content-dependent; its quality is mostly copywriting, and the Quiet section has a real tone hazard.
 
 ## Cut
 

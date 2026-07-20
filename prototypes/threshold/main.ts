@@ -11,6 +11,8 @@
 import { OmiMock, omiScenarioNames, type OmiScenarioName } from '../../reference/hackathon-pack/src';
 import type { Conversation, Memory, OmiSnapshot, Person, SuggestedAction } from '../../reference/hackathon-pack/src/types';
 import { mountMacStage } from '../_macos-stage';
+import { createVoiceInput, pushToTalk } from '../_voice';
+import { openOmiChat, type ChatContext, type OmiChat } from './chat';
 import './style.css';
 
 /* ---------------------------------------------------------------------- *
@@ -72,6 +74,8 @@ interface Brief {
   support: SupportLine[];
   receiptTitle: string;
   receipt: Array<{ speaker: string; text: string }>;
+  /** Everything the handoff window needs, resolved once here. */
+  chat: ChatContext;
 }
 
 const firstName = (person: Person): string => person.name.split(' ')[0]!;
@@ -127,6 +131,8 @@ function buildBrief(person: Person, snapshot: OmiSnapshot): Brief | undefined {
     });
   }
 
+  const lastSpoke = source ? relativeDays(daysBetween(source.startedAt, FIXTURE_NOW)) : undefined;
+
   return {
     person,
     fact: commitment.title,
@@ -137,7 +143,26 @@ function buildBrief(person: Person, snapshot: OmiSnapshot): Brief | undefined {
       speaker: segment.speaker,
       text: segment.text,
     })),
+    chat: {
+      person,
+      action: commitment,
+      source,
+      memories: snapshot.memories
+        .filter((memory) => memory.people.includes(person.id))
+        .sort((a, b) => (b.relevance ?? 0) - (a.relevance ?? 0)),
+      lastSpoke,
+      dueLabel: commitment.dueAt ? dueLabel(commitment.dueAt) : undefined,
+    },
   };
+}
+
+/** Actions carry exactly one `dueAt`, so this is the only time language there is. */
+function dueLabel(dueAt: string): string {
+  const days = Math.round((new Date(dueAt).getTime() - FIXTURE_NOW.getTime()) / 86_400_000);
+  if (days < 0) return 'Overdue';
+  if (days === 0) return 'Due today';
+  if (days === 1) return 'Due tomorrow';
+  return `Due in ${days} days`;
 }
 
 /** Fabricated calendar: whoever you owe something to, in the order you owe it. */
@@ -151,6 +176,9 @@ function upcoming(snapshot: OmiSnapshot): Brief[] {
 /* ---------------------------------------------------------------------- *
  * Rendering
  * ---------------------------------------------------------------------- */
+
+/** Bars in the push-to-talk meter. Enough to read as audio, few enough to stay quiet. */
+const WAVE_BARS = 26;
 
 function countdownLabel(secondsOut: number): string {
   if (secondsOut <= 0) return 'now';
@@ -190,6 +218,15 @@ function buildCard(brief: Brief): HTMLElement {
         ${receipt}
       </div>
     </div>
+    <p class="utterance" data-utterance></p>
+    <div class="foot">
+      <div class="ptt" data-ptt>
+        <span class="mic" aria-hidden="true"></span>
+        <kbd class="keycap">⌘</kbd>
+        <span class="wave" data-wave aria-hidden="true">${'<i></i>'.repeat(WAVE_BARS)}</span>
+      </div>
+      <button class="cta" type="button" data-open>Open in Omi</button>
+    </div>
     <span class="grip" aria-hidden="true"></span>
   `;
 
@@ -212,10 +249,14 @@ function present(brief: Brief): void {
   const whenEl = card.querySelector<HTMLElement>('[data-when]')!;
   const receiptEl = card.querySelector<HTMLElement>('[data-receipt]')!;
   const receiptInner = card.querySelector<HTMLElement>('[data-receipt-inner]')!;
+  const utteranceEl = card.querySelector<HTMLElement>('[data-utterance]')!;
+  const bars = [...card.querySelectorAll<HTMLElement>('[data-wave] i')];
 
   let secondsOut = LEAD_SECONDS;
   let unfolded = false;
   let done = false;
+  /** Held open by the chat window or an active hold. The meeting waits. */
+  let paused = false;
 
   card.addEventListener('animationend', () => card.classList.remove('is-entering'), { once: true });
 
@@ -227,11 +268,94 @@ function present(brief: Brief): void {
   }
 
   ticker = window.setInterval(() => {
+    if (paused) return;
     secondsOut -= TIME_COMPRESSION / 4;
     whenEl.textContent = countdownLabel(Math.max(0, Math.round(secondsOut)));
     whenEl.classList.toggle('is-imminent', secondsOut <= 60);
     if (secondsOut <= 0) expire();
   }, 250);
+
+  /* -- push to talk ---------------------------------------------------- *
+   *
+   * Hold right ⌘ and the card starts listening. It is the only object on
+   * screen, so it does not need a target: the meter grows out of the footer
+   * it already had, and the words land in the card rather than in a HUD.
+   * Release hands the question to the chat window.
+   * -------------------------------------------------------------------- */
+
+  const question = `What did I promise ${firstName(brief.person)}?`;
+  const words = question.split(' ');
+  let spoken = 0;
+  let history = new Array<number>(WAVE_BARS).fill(0);
+  let reveal: number | undefined;
+
+  function paintWave(level: number): void {
+    history = [...history.slice(1), level];
+    for (const [i, bar] of bars.entries()) {
+      // Taper the ends so the meter reads as a shape rather than a bar chart.
+      const taper = Math.sin((i / (WAVE_BARS - 1)) * Math.PI) * 0.45 + 0.55;
+      bar.style.transform = `scaleY(${0.08 + history[i]! * taper * 0.92})`;
+    }
+  }
+
+  const voice = createVoiceInput({
+    onLevel: ({ level }) => paintWave(level),
+    onSpeechStart: () => card.classList.add('is-hearing'),
+    onSpeechEnd: () => card.classList.remove('is-hearing'),
+  });
+
+  function beginHold(): void {
+    if (done || chat) return;
+    paused = true;
+    spoken = 0;
+    utteranceEl.textContent = '';
+    card.classList.add('is-listening');
+    void voice.start();
+    // Words land at a speaking cadence rather than all at once on release.
+    reveal = window.setInterval(() => {
+      if (spoken >= words.length) return;
+      spoken += 1;
+      utteranceEl.textContent = words.slice(0, spoken).join(' ');
+    }, 190);
+  }
+
+  function endHold(): void {
+    if (reveal !== undefined) window.clearInterval(reveal);
+    reveal = undefined;
+    voice.stop();
+    card.classList.remove('is-listening', 'is-hearing');
+    paused = false;
+
+    // A tap of the key is not an utterance; it leaves no trace.
+    if (spoken < 2) {
+      utteranceEl.textContent = '';
+      return;
+    }
+    utteranceEl.textContent = question;
+    window.setTimeout(() => handOff(question), 340);
+  }
+
+  const unbindPtt = pushToTalk({ onPress: beginHold, onRelease: endHold });
+
+  /* -- handoff to the chat window -------------------------------------- */
+
+  let chat: OmiChat | undefined;
+
+  function handOff(asking?: string): void {
+    if (done || chat) return;
+    paused = true;
+    card.classList.add('is-handing-off');
+    chat = openOmiChat(stage.surface, brief.chat, () => {
+      chat = undefined;
+      // The moment is over either way. Threshold does not resume a card.
+      advance(0);
+    }, asking);
+  }
+
+  card.querySelector<HTMLButtonElement>('[data-open]')!.addEventListener('click', (event) => {
+    event.stopPropagation();
+    handOff();
+  });
 
   /* -- unfold ---------------------------------------------------------- */
 
@@ -248,6 +372,8 @@ function present(brief: Brief): void {
     if (done) return;
     done = true;
     stopTicker();
+    unbindPtt();
+    voice.destroy();
     window.setTimeout(next, delay);
   }
 
@@ -280,6 +406,8 @@ function present(brief: Brief): void {
 
   card.addEventListener('pointerdown', (event: PointerEvent) => {
     if (done) return;
+    // The button is a target, not a handle.
+    if ((event.target as HTMLElement).closest('.cta')) return;
     dragging = true;
     axis = 'none';
     startX = lastX = event.clientX;
@@ -342,7 +470,10 @@ function present(brief: Brief): void {
 
   card.addEventListener('keydown', (event: KeyboardEvent) => {
     if (done) return;
-    if (event.key === 'Enter' || event.key === ' ') {
+    if (event.key === 'Enter' && event.metaKey) {
+      event.preventDefault();
+      handOff();
+    } else if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       setUnfolded(!unfolded);
     } else if (event.key === 'Escape' || event.key === 'ArrowRight') {

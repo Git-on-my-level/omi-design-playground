@@ -48,22 +48,36 @@ body {
 
 /* ---- the card ---------------------------------------------------------- */
 
+/*
+ * Real glass. The tint is thin enough to read the lake through, and the
+ * backdrop is darkened *before* the tint lands — that is what keeps a warm-dark
+ * register legible over a bright wallpaper instead of turning it into milk.
+ */
 .card {
   position: relative;
   width: 380px;
-  padding: 32px;
+  padding: 32px 32px 26px;
   border-radius: 24px;
-  background: linear-gradient(168deg, rgba(38, 33, 29, 0.92), rgba(23, 20, 18, 0.94));
-  border: 1px solid var(--edge);
-  backdrop-filter: blur(40px) saturate(1.4);
+  background: linear-gradient(168deg, rgba(58, 44, 34, 0.3), rgba(22, 18, 15, 0.42));
+  border: 1px solid rgba(245, 239, 230, 0.14);
+  backdrop-filter: blur(26px) saturate(135%) brightness(0.6);
+  -webkit-backdrop-filter: blur(26px) saturate(135%) brightness(0.6);
   box-shadow:
-    0 1px 0 0 rgba(245, 239, 230, 0.06) inset,
-    0 24px 60px -20px rgba(0, 0, 0, 0.75),
-    0 8px 28px -12px rgba(232, 116, 59, 0.18);
+    0 1px 0 0 rgba(245, 239, 230, 0.14) inset,
+    0 0 0 0.5px rgba(0, 0, 0, 0.5),
+    0 28px 70px -22px rgba(0, 0, 0, 0.7),
+    0 8px 28px -12px rgba(232, 116, 59, 0.16);
   cursor: grab;
   touch-action: none;
   user-select: none;
   outline: none;
+}
+
+/* Without vibrancy the tint alone would be unreadable, so it goes solid. */
+@supports not (backdrop-filter: blur(1px)) {
+  .card {
+    background: linear-gradient(168deg, rgba(38, 33, 29, 0.96), rgba(23, 20, 18, 0.97));
+  }
 }
 
 /* The card takes focus on arrival so keys work. A browser focus ring would be
@@ -155,6 +169,8 @@ body {
   letter-spacing: -0.02em;
   color: var(--ink);
   text-wrap: balance;
+  /* The backdrop is live now; the fact must hold over a bright patch of it. */
+  text-shadow: 0 1px 16px rgba(0, 0, 0, 0.45);
 }
 
 /* ---- supporting lines: same size as eyebrow, never a third scale ------- */
@@ -264,10 +280,11 @@ body {
 
 /* ---- affordance: the only chrome on the card --------------------------- */
 
+/* Moved to the head of the card once the footer took the bottom edge. */
 .grip {
   position: absolute;
   left: 50%;
-  bottom: 9px;
+  top: 10px;
   width: 28px;
   height: 2px;
   margin-left: -14px;
@@ -283,6 +300,616 @@ body {
 
 .card.is-unfolded .grip {
   background: rgba(232, 116, 59, 0.4);
+}
+
+/* ---- footer: voice on the left, the way out on the right --------------- */
+
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--edge);
+}
+
+/* The push-to-talk cluster. At rest it is a dot and a key; held, it becomes
+   the meter and takes the whole width. */
+.ptt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* A microphone, drawn small: capsule, yoke, stand. */
+.mic {
+  width: 11px;
+  height: 15px;
+  flex: none;
+  background: rgba(245, 239, 230, 0.55);
+  transition: background 200ms ease-out, filter 200ms ease-out;
+  -webkit-mask: var(--mic-glyph) center / contain no-repeat;
+  mask: var(--mic-glyph) center / contain no-repeat;
+}
+
+:root {
+  --mic-glyph: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 16'><rect x='4' y='0.5' width='4' height='8' rx='2'/><path d='M2 6.6v1.2a4 4 0 0 0 8 0V6.6' fill='none' stroke='black' stroke-width='1.3'/><rect x='5.35' y='11.8' width='1.3' height='3.4' rx='0.6'/></svg>");
+}
+
+.keycap {
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 7px 5px;
+  border-radius: 5px;
+  color: rgba(245, 239, 230, 0.72);
+  background: rgba(245, 239, 230, 0.11);
+  box-shadow:
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(245, 239, 230, 0.14);
+  transition: color 200ms ease-out, background 200ms ease-out;
+}
+
+/* ---- the meter --------------------------------------------------------- */
+
+.wave {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 18px;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: width 320ms var(--settle), opacity 200ms ease-out;
+}
+
+.wave i {
+  display: block;
+  width: 2px;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--ember);
+  transform: scaleY(0.08);
+  transform-origin: center;
+}
+
+.card.is-listening .wave {
+  width: 148px;
+  opacity: 0.85;
+}
+
+.card.is-listening .mic {
+  background: var(--ember);
+  filter: drop-shadow(0 0 6px rgba(232, 116, 59, 0.6));
+}
+
+.card.is-listening .keycap {
+  color: rgba(232, 116, 59, 0.9);
+  background: rgba(232, 116, 59, 0.14);
+}
+
+/* Listening is a state of the card, not a badge on it. */
+.card.is-listening {
+  border-color: rgba(232, 116, 59, 0.3);
+  box-shadow:
+    0 1px 0 0 rgba(245, 239, 230, 0.14) inset,
+    0 0 0 0.5px rgba(0, 0, 0, 0.5),
+    0 28px 70px -22px rgba(0, 0, 0, 0.7),
+    0 10px 40px -10px rgba(232, 116, 59, 0.34);
+}
+
+/* The ember is already spoken for while listening, so the countdown yields. */
+.card.is-listening .when.is-imminent {
+  color: var(--ink-dim);
+}
+
+.card.is-listening .cta {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(6px);
+}
+
+/* ---- what you said ----------------------------------------------------- */
+
+.utterance {
+  margin: 0;
+  max-height: 0;
+  opacity: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: rgba(245, 239, 230, 0.9);
+  transition:
+    max-height 260ms var(--settle),
+    opacity 200ms ease-out,
+    margin 260ms var(--settle);
+}
+
+.utterance:not(:empty) {
+  margin-top: 22px;
+  max-height: 72px;
+  opacity: 1;
+}
+
+/* ---- the way out ------------------------------------------------------- */
+
+.cta {
+  flex: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: rgba(245, 239, 230, 0.82);
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 239, 230, 0.16);
+  background: rgba(245, 239, 230, 0.06);
+  cursor: pointer;
+  transition:
+    background 180ms ease-out,
+    border-color 180ms ease-out,
+    color 180ms ease-out,
+    opacity 200ms ease-out,
+    transform 240ms var(--settle);
+}
+
+.cta:hover {
+  color: #fff;
+  border-color: rgba(232, 116, 59, 0.55);
+  background: rgba(232, 116, 59, 0.18);
+}
+
+.cta:focus-visible {
+  outline: none;
+  border-color: rgba(232, 116, 59, 0.7);
+}
+
+/* ---- handing off to the window ----------------------------------------- */
+
+.card.is-handing-off {
+  transition:
+    transform 320ms var(--settle),
+    opacity 260ms ease-out,
+    filter 260ms ease-out;
+  transform: translateY(-6px) scale(0.96);
+  opacity: 0;
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+/* ---- omi window -------------------------------------------------------- */
+
+.omi-window {
+  position: fixed;
+  top: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  width: 620px;
+  max-height: calc(100vh - 180px);
+  border-radius: 14px;
+  overflow: hidden;
+  color: var(--ink);
+  background: linear-gradient(180deg, rgba(44, 36, 30, 0.5), rgba(19, 16, 14, 0.6));
+  border: 1px solid rgba(245, 239, 230, 0.12);
+  backdrop-filter: blur(40px) saturate(140%) brightness(0.5);
+  -webkit-backdrop-filter: blur(40px) saturate(140%) brightness(0.5);
+  box-shadow:
+    0 1px 0 0 rgba(245, 239, 230, 0.12) inset,
+    0 0 0 0.5px rgba(0, 0, 0, 0.55),
+    0 40px 100px -30px rgba(0, 0, 0, 0.8);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .omi-window {
+    background: linear-gradient(180deg, rgba(32, 28, 24, 0.98), rgba(19, 16, 14, 0.99));
+  }
+}
+
+.omi-window.is-opening {
+  animation: windowIn 260ms var(--settle) both;
+}
+
+.omi-window.is-closing {
+  transition: opacity 200ms ease-out, transform 200ms ease-in;
+  opacity: 0;
+  transform: translateX(-50%) scale(0.985);
+}
+
+@keyframes windowIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* ---- title bar --------------------------------------------------------- */
+
+.win-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 14px;
+  flex: none;
+  cursor: default;
+  background: rgba(245, 239, 230, 0.04);
+  border-bottom: 1px solid rgba(245, 239, 230, 0.07);
+  user-select: none;
+}
+
+.lights {
+  display: flex;
+  gap: 8px;
+}
+
+.lights i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.l-close {
+  background: #ff5f57;
+}
+.l-min {
+  background: #febc2e;
+}
+.l-max {
+  background: #28c840;
+}
+
+.win-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(245, 239, 230, 0.72);
+}
+
+/* ---- body -------------------------------------------------------------- */
+
+.win-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+/* ---- context cards ----------------------------------------------------- */
+
+.ctx-rail {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  flex: none;
+  border-bottom: 1px solid var(--edge);
+}
+
+.ctx {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(245, 239, 230, 0.05);
+  border: 1px solid rgba(245, 239, 230, 0.08);
+}
+
+.ctx-avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #1a1512;
+  background: linear-gradient(150deg, #f0a37a, #e8743b);
+}
+
+.ctx-check {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(245, 239, 230, 0.35);
+  background: none;
+  cursor: pointer;
+  transition: background 160ms ease-out, border-color 160ms ease-out;
+}
+
+.ctx-check:hover {
+  border-color: var(--ember);
+}
+
+.ctx.is-complete .ctx-check {
+  background: var(--ember);
+  border-color: var(--ember);
+}
+
+.ctx.is-complete .ctx-task {
+  text-decoration: line-through;
+  color: var(--ink-dim);
+}
+
+.ctx-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.ctx-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.ctx-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: rgba(245, 239, 230, 0.62);
+}
+
+.ctx-meta {
+  margin: 3px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--ink-dim);
+}
+
+.ctx-kind {
+  flex: none;
+  align-self: flex-start;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 4px;
+  color: rgba(245, 239, 230, 0.5);
+  background: rgba(245, 239, 230, 0.07);
+}
+
+/* ---- thread ------------------------------------------------------------ */
+
+.thread {
+  flex: 1;
+  min-height: 180px;
+  overflow-y: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 239, 230, 0.16) transparent;
+}
+
+.msg {
+  max-width: 82%;
+  font-size: 13.5px;
+  line-height: 1.5;
+  animation: liftIn 240ms var(--settle) both;
+}
+
+.msg-user {
+  align-self: flex-end;
+  margin: 0;
+  padding: 9px 14px;
+  border-radius: 16px 16px 4px 16px;
+  color: #fff;
+  background: rgba(232, 116, 59, 0.24);
+  border: 1px solid rgba(232, 116, 59, 0.3);
+}
+
+.msg-omi {
+  align-self: flex-start;
+  color: rgba(245, 239, 230, 0.88);
+}
+
+.msg-line {
+  margin: 0 0 6px;
+}
+
+.msg-line:last-of-type {
+  margin-bottom: 0;
+}
+
+.msg-quote {
+  margin: 10px 0 0;
+  padding: 2px 0 2px 12px;
+  border-left: 1px solid rgba(232, 116, 59, 0.4);
+  font-size: 12.5px;
+  line-height: 1.5;
+  font-style: italic;
+  color: rgba(245, 239, 230, 0.66);
+}
+
+.msg-cite {
+  margin: 8px 0 0;
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(138, 128, 121, 0.75);
+}
+
+/* Thinking: three dots, no spinner, no "omi is typing" caption. */
+.dots {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(245, 239, 230, 0.4);
+  animation: blink 1.1s ease-in-out infinite;
+}
+
+.dots i:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.dots i:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* ---- footer: chips + composer ------------------------------------------ */
+
+.win-foot {
+  flex: none;
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--edge);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chips:not(:empty) {
+  margin-bottom: 12px;
+}
+
+.chip {
+  font: inherit;
+  font-size: 12px;
+  color: rgba(245, 239, 230, 0.7);
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 239, 230, 0.14);
+  background: rgba(245, 239, 230, 0.04);
+  cursor: pointer;
+  transition: background 160ms ease-out, color 160ms ease-out, border-color 160ms ease-out;
+}
+
+.chip:hover {
+  color: #fff;
+  border-color: rgba(232, 116, 59, 0.5);
+  background: rgba(232, 116, 59, 0.16);
+}
+
+.composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 999px;
+  background: rgba(245, 239, 230, 0.06);
+  border: 1px solid rgba(245, 239, 230, 0.12);
+  transition: border-color 200ms ease-out, box-shadow 200ms ease-out;
+}
+
+.composer:focus-within {
+  border-color: rgba(245, 239, 230, 0.24);
+}
+
+.composer-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: none;
+  border: none;
+  outline: none;
+}
+
+.composer-input::placeholder {
+  color: rgba(138, 128, 121, 0.8);
+}
+
+.composer-wave {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: width 300ms var(--settle), opacity 180ms ease-out;
+}
+
+.composer-wave i {
+  display: block;
+  width: 2px;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--ember);
+  transform: scaleY(0.08);
+}
+
+.composer-key {
+  font: inherit;
+  font-size: 10px;
+  line-height: 1;
+  padding: 4px 6px 5px;
+  border-radius: 5px;
+  color: rgba(245, 239, 230, 0.45);
+  background: rgba(245, 239, 230, 0.07);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+  transition: color 200ms ease-out, background 200ms ease-out;
+}
+
+.omi-window.is-listening .composer {
+  border-color: rgba(232, 116, 59, 0.42);
+  box-shadow: 0 0 0 4px rgba(232, 116, 59, 0.1);
+}
+
+.omi-window.is-listening .composer-wave {
+  width: 90px;
+  opacity: 0.9;
+}
+
+.omi-window.is-listening .composer-key {
+  color: rgba(232, 116, 59, 0.9);
+  background: rgba(232, 116, 59, 0.16);
+}
+
+.composer-send {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  font-size: 14px;
+  border-radius: 50%;
+  border: none;
+  color: rgba(245, 239, 230, 0.75);
+  background: rgba(245, 239, 230, 0.09);
+  cursor: pointer;
+  transition: background 160ms ease-out, color 160ms ease-out;
+}
+
+.composer-send:hover {
+  color: #fff;
+  background: var(--ember);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -10,6 +10,7 @@ Spray-and-pray UI/UX exploration. Many distinct concepts beat one polished app.
 | `prototypes/<name>/` | **Your concepts.** One idea per directory. Self-contained HTML/CSS/JS(TS). |
 | `prototypes/_template/` | **Scaffold to copy.** Wiring only, zero visual language. Never import from it. |
 | `prototypes/_macos-stage/` | **Shared macOS desktop.** Wallpaper, menu bar, widgets, files, dock. A bezel for overlay concepts. |
+| `prototypes/_voice/` | **Voice detection, no UI.** Mic level + speech boundaries + push-to-talk key binding. You draw the meter. |
 | `reference/hackathon-pack/` | **Read-only capability pack.** Mock SDK, synthetic scenarios, docs, diagnostic harness. |
 | `reference/impeccable/` | **Read-only design skill reference** ([pbakaus/impeccable](https://github.com/pbakaus/impeccable)). Craft/critique guidance—not a Cursor install. |
 | `scripts/serve-prototype.sh` | Serve any prototype by name. |
@@ -55,6 +56,21 @@ wrapping mid-phrase, a surface that reads as unfinished rather than calm.
 `--wait` advances virtual time, so timers and animations fast-forward deterministically. A prototype
 with a running `setInterval` never lets Chrome exit on its own; the script handles that.
 
+**Screenshotting a state you can only reach by interacting** (a panel mid-gesture, a listening
+state, a window opened by a click): the script cannot press keys. Temporarily patch the entry point
+to trigger it on a timer, shoot, then remove the patch — and check `git diff` before you commit, so
+the trigger does not ship. Do not leave a `?state=` switch in the prototype; that is scenario
+chrome, and it violates the no-explanatory-text rule the moment anyone finds it.
+
+Two defects that only appear under virtual time, both worth knowing about:
+
+- **Frame-count-based animation goes flat.** Chrome serves few `requestAnimationFrame` callbacks
+  while fast-forwarding, so any easing written as `value += (target - value) * 0.2` never converges.
+  Derive the coefficient from elapsed time instead. `_voice` does this.
+- **Permission prompts never settle.** Headless has no one to answer them, so a bare
+  `await navigator.mediaDevices.getUserMedia(...)` hangs forever and the feature is simply dead in
+  the screenshot. Race permission requests against a timeout and fall back.
+
 ## Distinctness rule
 
 Each prototype is a **separate bet**, not a revision of another:
@@ -93,6 +109,26 @@ prototype instead.
 Concepts that genuinely need windows and apps *behind* the overlay (a document being annotated, a
 call in progress) should build that background content inside their own directory. Do not grow
 `_macos-stage` into a window manager.
+
+## Adding voice
+
+`_voice` is the other shared carve-out, and it holds for the same reason: it emits **numbers, not
+pixels**. A level, a speaking flag, and a key binding. Every meter, waveform, and listening state is
+yours to draw, so two prototypes using it do not end up looking alike.
+
+```ts
+import { createVoiceInput, pushToTalk } from '../_voice';
+
+const voice = createVoiceInput({ onLevel: ({ level }) => paint(level) });
+const unbind = pushToTalk({ onPress: () => void voice.start(), onRelease: () => voice.stop() });
+```
+
+It uses the real microphone when granted and falls back to a deterministic synthetic envelope when
+not — headless Chrome has no mic, so **a prototype that needs a granted permission to look alive
+cannot be screenshotted.** Call `voice.destroy()` and `unbind()` when the surface goes away.
+Transcription does not exist; fabricate the words and say so in the README.
+
+Same rule as the stage: if you want to add a visual token to `_voice`, it belongs in your prototype.
 
 Do not use the stage for iOS concepts, full-screen apps that own the whole display, or anything
 where the desktop would be pure decoration.
