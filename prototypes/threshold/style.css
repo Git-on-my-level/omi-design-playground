@@ -1,0 +1,296 @@
+/*
+ * threshold — the twenty seconds before you walk into the room.
+ *
+ * Register: the green room. Warm dark, dim, moments before you go on.
+ * One ember accent per card, never two. Two type sizes visible at once.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+:root {
+  --void: #12100e;
+  --card: #1c1916;
+  --ink: #f5efe6;
+  --ink-dim: #8a8079;
+  --ember: #e8743b;
+  --edge: rgba(245, 239, 230, 0.08);
+
+  --settle: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  color: var(--ink);
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+/* ---- stage ------------------------------------------------------------- */
+
+.stage {
+  position: fixed;
+  top: 58px;
+  right: 32px;
+  width: 380px;
+}
+
+/* ---- the card ---------------------------------------------------------- */
+
+.card {
+  position: relative;
+  width: 380px;
+  padding: 32px;
+  border-radius: 24px;
+  background: linear-gradient(168deg, rgba(38, 33, 29, 0.92), rgba(23, 20, 18, 0.94));
+  border: 1px solid var(--edge);
+  backdrop-filter: blur(40px) saturate(1.4);
+  box-shadow:
+    0 1px 0 0 rgba(245, 239, 230, 0.06) inset,
+    0 24px 60px -20px rgba(0, 0, 0, 0.75),
+    0 8px 28px -12px rgba(232, 116, 59, 0.18);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+
+/* The card takes focus on arrival so keys work. A browser focus ring would be
+   the loudest thing on screen, so it gets the card's own quiet treatment. */
+.card:focus-visible {
+  border-color: rgba(232, 116, 59, 0.45);
+}
+
+.card:active {
+  cursor: grabbing;
+}
+
+.card.is-entering {
+  animation: settle 420ms var(--settle) both;
+}
+
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.97);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* Thrown away. Never returns. */
+.card.is-thrown {
+  transition:
+    transform 520ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 420ms ease-out;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Expired quietly at T-0. */
+.card.is-spent {
+  transition:
+    transform 460ms var(--settle),
+    opacity 380ms ease-out,
+    filter 380ms ease-out;
+  opacity: 0;
+  transform: translateY(-10px) scale(0.98);
+  filter: blur(6px);
+  pointer-events: none;
+}
+
+/* ---- eyebrow: person + time until -------------------------------------- */
+
+.eyebrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 22px;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.who {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.when {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The one urgent thing gets the one ember. */
+.when.is-imminent {
+  color: var(--ember);
+}
+
+/* ---- the fact ---------------------------------------------------------- */
+
+.fact {
+  margin: 0;
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 48px;
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+/* ---- supporting lines: same size as eyebrow, never a third scale ------- */
+
+.support {
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--edge);
+  padding-top: 20px;
+}
+
+/* Label above value: the labels never wrap, and the value gets the full
+   measure of the card. */
+.support li {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+.support .label {
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(138, 128, 121, 0.55);
+}
+
+.support .value {
+  color: rgba(245, 239, 230, 0.78);
+}
+
+/* ---- receipt (drag down to unfold) ------------------------------------- */
+
+.receipt {
+  overflow: hidden;
+  height: 0;
+  opacity: 0;
+  transition:
+    height 280ms var(--settle),
+    opacity 200ms ease-out;
+}
+
+.card.is-unfolded .receipt {
+  opacity: 1;
+}
+
+.receipt-inner {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--edge);
+}
+
+.receipt-source {
+  margin: 0 0 14px;
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(138, 128, 121, 0.62);
+}
+
+.receipt-line {
+  margin: 0 0 10px;
+  padding-left: 14px;
+  border-left: 1px solid rgba(232, 116, 59, 0.28);
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(245, 239, 230, 0.7);
+}
+
+.receipt-line:last-child {
+  margin-bottom: 0;
+}
+
+.receipt-line .speaker {
+  font-style: italic;
+  color: var(--ink-dim);
+}
+
+/* Staggered so the receipt assembles rather than appears. */
+.card.is-unfolded .receipt-line {
+  animation: liftIn 280ms var(--settle) both;
+}
+
+.card.is-unfolded .receipt-line:nth-child(2) {
+  animation-delay: 40ms;
+}
+.card.is-unfolded .receipt-line:nth-child(3) {
+  animation-delay: 80ms;
+}
+.card.is-unfolded .receipt-line:nth-child(4) {
+  animation-delay: 120ms;
+}
+
+@keyframes liftIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---- affordance: the only chrome on the card --------------------------- */
+
+.grip {
+  position: absolute;
+  left: 50%;
+  bottom: 9px;
+  width: 28px;
+  height: 2px;
+  margin-left: -14px;
+  border-radius: 2px;
+  background: rgba(245, 239, 230, 0.14);
+  transition: background 200ms ease-out, width 200ms var(--settle);
+}
+
+.card:hover .grip {
+  background: rgba(245, 239, 230, 0.26);
+  width: 36px;
+}
+
+.card.is-unfolded .grip {
+  background: rgba(232, 116, 59, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
