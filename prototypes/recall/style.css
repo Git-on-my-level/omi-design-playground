@@ -296,6 +296,11 @@ video {
   50% { opacity: 0; }
 }
 
+/* Live canned typing sits in the document as ordinary text. */
+.doc-typed {
+  white-space: pre-wrap;
+}
+
 .doc-ghost {
   color: rgba(44, 42, 39, 0.38);
 }
@@ -524,6 +529,16 @@ video {
 
 .recall-card[data-state='noted'] .recall-actions {
   display: none;
+}
+
+.recall-alt {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.recall-alt::before {
+  content: '·';
+  margin: 0 6px;
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .recall-actions {

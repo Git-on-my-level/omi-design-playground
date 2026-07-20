@@ -2,8 +2,10 @@
  * Recall — remembering shouldn't be a place you go.
  *
  * Hold right ⌘ in Mail or Messages, ask out loud, release. Ghost text at the
- * caret (Tab or Enter to insert), source card beside the window. Type instead
- * in the app — Omi notes the correction as a new memory. Esc dismisses.
+ * caret (Tab or Enter to insert), source card beside the window. Type your own
+ * line instead and Omi learns it as a new memory — no card while typing, then
+ * the learned after-card on send (Messages) or when the line finishes (Mail).
+ * Keys are canned (see TYPED). Esc cancels with no trace.
  *
  * Speech-to-text does not exist in the pack; spoken questions are scripted.
  * See README.md.
@@ -27,9 +29,13 @@ const SCRIPT: Array<{ asked: string; segmentId?: string }> = [
   { asked: 'did anyone mention the offsite budget' }, // an honest miss
 ];
 
-/** Typed corrections are canned — keys only trigger the beat, they don't spell. */
-const CORRECTIONS: Record<AppId, string> = {
-  mail: 'the decision and the reason have to travel together — not a dump of notes.',
+/**
+ * Typing is canned: real keys are ignored and this fixed text is revealed one
+ * character per keypress, in either app. Whatever the user "types" while a
+ * recall is showing becomes the new memory Omi learns on dismiss.
+ */
+const TYPED: Record<AppId, string> = {
+  mail: '\u201Cthe reason has to travel with the decision — not a pile of raw notes.\u201D',
   messages: 'Yes — the repeated workaround is the real signal, even when the ask sounds small.',
 };
 
@@ -130,7 +136,7 @@ card.innerHTML = `
   <p class="recall-quote"></p>
   <p class="recall-receipt"></p>
   <p class="recall-note" data-note></p>
-  <p class="recall-actions"><kbd>⇥</kbd> / <kbd>↵</kbd> insert<span class="recall-esc">type to correct · <kbd>esc</kbd></span></p>
+  <p class="recall-actions"><kbd>⇥</kbd> insert<span class="recall-alt">or just type</span><span class="recall-esc"><kbd>esc</kbd></span></p>
 `;
 stage.surface.append(card);
 
@@ -143,6 +149,7 @@ const noteEl = card.querySelector<HTMLElement>('[data-note]')!;
 let activeApp: AppId = 'mail';
 let caretEl = mail.querySelector<HTMLElement>('[data-caret]')!;
 let ghostEl = mail.querySelector<HTMLElement>('[data-ghost]')!;
+let liveSpan: HTMLElement | null = null; // Mail's in-progress typed text, sits at the caret
 let frontWindow: HTMLElement = mail;
 
 function place(): void {
@@ -161,7 +168,7 @@ function place(): void {
 }
 
 function setFront(app: AppId): void {
-  if (state !== 'idle') dismiss();
+  if (state !== 'idle') reset(); // switching apps abandons the recall, no trace
 
   activeApp = app;
   frontWindow = app === 'mail' ? mail : messages;
@@ -235,13 +242,19 @@ void omi.getSnapshot().then((s) => {
 
 /* -- choreography ---------------------------------------------------------- */
 
-type State = 'idle' | 'listening' | 'thinking' | 'answered' | 'missed' | 'noted';
+type State = 'idle' | 'listening' | 'thinking' | 'answered' | 'typing' | 'missed' | 'noted';
+
+const ANSWER_HOLD_MS = 14000; // ignored answer dissolves
+const TYPING_HOLD_MS = 18000; // fallback while the user is typing
+const LEARN_HOLD_MS = 7000; // learned card lingers before it clears
+const TYPE_STEP = 4; // canned chars revealed (or deleted) per keystroke
 
 let state: State = 'idle';
 let scriptIndex = 0;
 let heardWords = 0;
 let pressedAt = 0;
 let pendingInsert = '';
+let typedBuffer = ''; // canned text revealed so far; the memory Omi learns on dismiss
 const timers = new Set<number>();
 
 function after(ms: number, fn: () => void): void {
@@ -278,13 +291,35 @@ function showGhost(text: string): void {
   }
 }
 
-function dismiss(): void {
+/** A leading space so a fresh insertion doesn't butt against prior text. */
+function leadingSpace(): string {
+  const prev = caretEl.previousSibling?.textContent ?? '';
+  return prev && !/\s$/.test(prev) ? ' ' : '';
+}
+
+/** Hard clear — zero trace. Drops uncommitted typing; keeps committed text. */
+function reset(): void {
   clearTimers();
   clearGhost();
   pendingInsert = '';
+  typedBuffer = '';
+  if (liveSpan) {
+    liveSpan.remove();
+    liveSpan = null;
+  }
   noteEl.textContent = '';
-  if (activeApp === 'messages' && !msgField.value) msgField.placeholder = 'iMessage';
+  msgField.value = '';
+  msgField.placeholder = 'iMessage';
   setState('idle');
+}
+
+/** Conclude a typed line: the words become a learned memory (the after-card). */
+function dismiss(): void {
+  if (state === 'typing' && typedBuffer.trim()) {
+    learnFromTyped();
+    return;
+  }
+  reset();
 }
 
 /** Text shaped for the active app — quoted prose in Mail, plain in Messages. */
@@ -296,7 +331,7 @@ function formatInsert(line: string): string {
 function writeIntoMail(text: string, asCorrection = false): void {
   const inserted = document.createElement('span');
   inserted.className = asCorrection ? 'doc-inserted is-correction' : 'doc-inserted';
-  inserted.textContent = text;
+  inserted.textContent = leadingSpace() + text;
   caretEl.before(inserted);
 }
 
@@ -311,6 +346,118 @@ function sendMessage(text: string): void {
   bubble.scrollIntoView({ block: 'nearest' });
 }
 
+/** Show the canned text so far in whichever surface is active. */
+function renderTyped(): void {
+  if (activeApp === 'messages') {
+    msgField.value = typedBuffer;
+    if (typedBuffer) msgField.placeholder = '';
+  } else if (liveSpan) {
+    liveSpan.textContent = liveSpan.dataset.lead! + typedBuffer;
+  }
+}
+
+/** Enter the typing posture. No card shows while typing — only the after-card. */
+function beginTyping(): void {
+  clearTimers();
+  clearGhost();
+  typedBuffer = '';
+  if (activeApp === 'mail') {
+    liveSpan = document.createElement('span');
+    liveSpan.className = 'doc-typed';
+    liveSpan.dataset.lead = leadingSpace();
+    caretEl.before(liveSpan); // renders at the caret, after any accepted text
+  }
+  quoteEl.textContent = '';
+  receiptEl.textContent = '';
+  noteEl.textContent = '';
+  setState('typing');
+  scheduleLearn();
+}
+
+/**
+ * (Re)arm the auto-learn timer. Mail has no "send" gesture, so once the line is
+ * finished it concludes on its own into the same rich learned card Messages
+ * reaches on send; otherwise a long fallback keeps it alive while typing.
+ */
+function scheduleLearn(): void {
+  clearTimers();
+  const done = typedBuffer.length >= TYPED[activeApp].length;
+  after(activeApp === 'mail' && done ? 1000 : TYPING_HOLD_MS, dismiss);
+}
+
+/** A keypress reveals the next few canned characters — the real key is ignored. */
+function typeChar(): void {
+  // A keystroke from any settled state starts a fresh line (interrupting an
+  // answer or a lingering learned card); mid-line it just reveals more.
+  if (state === 'answered' || state === 'idle' || state === 'noted') beginTyping();
+  else if (state !== 'typing') return;
+
+  const full = TYPED[activeApp];
+  if (typedBuffer.length < full.length) {
+    typedBuffer = full.slice(0, Math.min(full.length, typedBuffer.length + TYPE_STEP));
+    renderTyped();
+  }
+  scheduleLearn();
+  place();
+}
+
+function backspace(): void {
+  if (activeApp === 'messages') {
+    if (state === 'typing' && typedBuffer) {
+      typedBuffer = typedBuffer.slice(0, -TYPE_STEP);
+      renderTyped();
+      scheduleLearn();
+    }
+    return;
+  }
+
+  // Mail: while typing, shorten the live line; otherwise delete committed text.
+  if (state === 'typing' && typedBuffer) {
+    typedBuffer = typedBuffer.slice(0, -TYPE_STEP);
+    renderTyped();
+    scheduleLearn();
+    place();
+    return;
+  }
+  let prev = caretEl.previousElementSibling as HTMLElement | null;
+  while (prev && !prev.textContent) {
+    const before = prev.previousElementSibling as HTMLElement | null;
+    prev.remove();
+    prev = before;
+  }
+  if (prev && (prev.classList.contains('doc-inserted') || prev.classList.contains('doc-typed'))) {
+    prev.textContent = prev.textContent!.slice(0, -TYPE_STEP);
+    if (!prev.textContent) prev.remove();
+    place();
+  }
+}
+
+/** The learn beat: the full line commits in place and becomes the new memory. */
+function learnFromTyped(): void {
+  clearTimers();
+  clearGhost();
+  const full = TYPED[activeApp]; // send the complete line even if typing was cut short
+  typedBuffer = '';
+
+  if (activeApp === 'messages') {
+    sendMessage(full);
+  } else if (liveSpan) {
+    liveSpan.textContent = liveSpan.dataset.lead! + full;
+    liveSpan.className = 'doc-inserted is-correction'; // promote live text to committed
+    liveSpan = null;
+  } else {
+    writeIntoMail(full, true);
+  }
+
+  const clean = full.replace(/^[\u201C"'\s]+|[\u201D"'.\s]+$/g, '');
+  quoteEl.textContent = `\u201C${clean}.\u201D`;
+  receiptEl.textContent = 'Learned from you \u00B7 just now';
+  noteEl.textContent = 'Noted — saved as a new memory.';
+  place();
+  setState('noted');
+  after(LEARN_HOLD_MS, reset);
+}
+
 const voice = createVoiceInput({
   onLevel: ({ level }) => dotEl.style.setProperty('--level', level.toFixed(3)),
 });
@@ -319,6 +466,12 @@ function beginListening(): void {
   clearTimers();
   clearGhost();
   pendingInsert = '';
+  typedBuffer = '';
+  if (liveSpan) {
+    liveSpan.remove();
+    liveSpan = null;
+  }
+  msgField.value = '';
   noteEl.textContent = '';
   pressedAt = performance.now();
   heardWords = 0;
@@ -368,7 +521,7 @@ function endListening(): void {
     noteEl.textContent = '';
     place();
     setState('answered');
-    after(14000, dismiss);
+    after(ANSWER_HOLD_MS, reset);
   });
 }
 
@@ -388,51 +541,38 @@ function accept(): void {
   setState('idle');
 }
 
-/** Type-over path: canned line lands in the app; card notes the learn. */
-function correct(): void {
-  if (state !== 'answered') return;
-  clearTimers();
-  const raw = CORRECTIONS[activeApp];
-  const text = formatInsert(raw);
-  pendingInsert = '';
-  clearGhost();
-
-  if (activeApp === 'messages') sendMessage(raw);
-  else writeIntoMail(text, true);
-
-  quoteEl.textContent = `\u201C${raw}\u201D`;
-  receiptEl.textContent = 'Learned from you · just now';
-  noteEl.textContent = 'Noted — saved as a new memory.';
-  place();
-  setState('noted');
-  after(2800, dismiss);
-}
+const isPrintable = (event: KeyboardEvent): boolean =>
+  event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey;
 
 msgSend.addEventListener('click', () => {
-  if (state === 'answered') {
-    accept();
-    return;
-  }
-  const text = msgField.value.trim();
-  if (text) sendMessage(text);
+  if (state === 'answered') accept();
+  else if (state === 'typing' && typedBuffer.trim()) dismiss(); // learn + send
+  else if (msgField.value.trim()) sendMessage(msgField.value.trim());
 });
 
 msgField.addEventListener('keydown', (event) => {
-  if (state === 'answered') {
-    if (event.key === 'Tab' || event.key === 'Enter') {
-      event.preventDefault();
-      accept();
-      return;
-    }
-    if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
-      event.preventDefault();
-      correct();
-    }
+  if (event.key === 'Tab' && state === 'answered') {
+    event.preventDefault();
+    accept();
     return;
   }
-  if (event.key === 'Enter' && msgField.value.trim()) {
+  if (event.key === 'Enter') {
     event.preventDefault();
-    sendMessage(msgField.value.trim());
+    if (state === 'answered') accept();
+    else if (state === 'typing' && typedBuffer.trim()) dismiss();
+    else if (msgField.value.trim()) sendMessage(msgField.value.trim());
+    return;
+  }
+  if (event.key === 'Backspace') {
+    if (state === 'typing') {
+      event.preventDefault();
+      backspace();
+    }
+    return; // otherwise let the input delete its own value natively
+  }
+  if (isPrintable(event)) {
+    event.preventDefault();
+    typeChar();
   }
 });
 
@@ -444,21 +584,34 @@ const unbind = pushToTalk({
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape' && state !== 'idle' && state !== 'listening') {
     event.preventDefault();
-    dismiss();
+    reset(); // Esc always cancels — zero trace
     return;
   }
 
-  if (state !== 'answered') return;
   if (document.activeElement === msgField) return; // Messages handler owns it
 
-  if (event.key === 'Tab' || event.key === 'Enter') {
+  if (event.key === 'Tab' && state === 'answered') {
     event.preventDefault();
     accept();
     return;
   }
-  if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
+  if (event.key === 'Enter' && state === 'answered') {
     event.preventDefault();
-    correct();
+    accept();
+    return;
+  }
+  if (event.key === 'Backspace') {
+    event.preventDefault();
+    backspace();
+    return;
+  }
+  // Canned typing works in Mail whether or not a recall is showing.
+  if (
+    isPrintable(event) &&
+    (state === 'idle' || state === 'answered' || state === 'typing' || state === 'noted')
+  ) {
+    event.preventDefault();
+    typeChar();
   }
 }
 

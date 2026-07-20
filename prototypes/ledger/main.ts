@@ -1,7 +1,8 @@
 import { OmiMock, omiScenarioNames, type OmiScenarioName } from '../../reference/hackathon-pack/src';
 import type { Conversation } from '../../reference/hackathon-pack/src/types';
 import { createVoiceInput, pushToTalk } from '../_voice';
-import { CONV_QUESTIONS, answerAboutConversation, type ConvAnswer } from './converse';
+import { CONV_QUESTIONS, answerAboutConversation } from './converse';
+import { REWIND_QUESTIONS, answerAboutRewind } from './rewind';
 import {
   GOALS,
   FIXTURE_NOW,
@@ -38,11 +39,12 @@ let conversations: Conversation[] = [];
 const peopleNames = new Map<string, string>();
 let view: 'book' | 'rewind' | 'conversations' = 'book';
 let openFrameId: string | null = null;
+let citedFrameId: string | null = null; // the frame an ask surfaced
 
 // Conversation page
 let openConvId: string | null = null;
-let openSegId: string | null = null;
-let convThread: Array<{ q: string; a: ConvAnswer; streaming?: boolean }> = [];
+let openSegId: string | null = null; // the originating quote (receipt)
+let citedSegId: string | null = null; // the segment an ask surfaced
 
 type Draft = Extract<Utterance, { kind: 'post' }> & { raw: string; shot?: Shot | null };
 let counterText = '';
@@ -157,7 +159,7 @@ function frameHtml(frame: RewindFrame): string {
   const open = openFrameId === frame.id;
   const conv = frame.entryId ? entries.find((e) => e.id === frame.entryId)?.conversationId ?? null : null;
   return `
-    <li class="frame${open ? ' is-open' : ''}${frame.entryId ? ' is-task' : ' is-ambient'}" data-frame="${frame.id}">
+    <li class="frame${open ? ' is-open' : ''}${frame.entryId ? ' is-task' : ' is-ambient'}${citedFrameId === frame.id ? ' is-cited' : ''}" data-frame="${frame.id}">
       <div class="frame-time" aria-hidden="true">
         <span class="frame-node"></span>
         <span class="frame-at">${frame.shot.at}</span>
@@ -252,32 +254,7 @@ function sidebarHtml(all: LedgerEntry[]): string {
         <p class="keeper">Riley Park</p>
       </header>
       <div class="rail-scroll">
-        <div class="sources" role="group" aria-label="Memory">
-          <button
-            type="button"
-            class="source${view === 'rewind' ? ' is-active' : ''}"
-            data-action="open-rewind"
-          >
-            <span class="source-icon">${ICON_REWIND}</span>
-            <span class="source-body">
-              <span class="source-name">Rewind</span>
-              <span class="source-count">${frames.length} captures</span>
-            </span>
-          </button>
-          <button
-            type="button"
-            class="source${view === 'conversations' ? ' is-active' : ''}"
-            data-action="open-conversations"
-          >
-            <span class="source-icon">${ICON_CONV}</span>
-            <span class="source-body">
-              <span class="source-name">Conversations</span>
-              <span class="source-count">${conversations.length} recorded</span>
-            </span>
-          </button>
-        </div>
-        <h2 class="rail-label">The book</h2>
-        <ul class="account-list">
+        <ul class="account-list account-list-lead">
           <li>
             <button
               type="button"
@@ -299,6 +276,30 @@ function sidebarHtml(all: LedgerEntry[]): string {
         <ul class="account-list">
           ${railAccounts(all, 'person').map(railRow).join('')}
         </ul>
+      </div>
+      <div class="sources" role="group" aria-label="Memory">
+        <button
+          type="button"
+          class="source${view === 'rewind' ? ' is-active' : ''}"
+          data-action="open-rewind"
+        >
+          <span class="source-icon">${ICON_REWIND}</span>
+          <span class="source-body">
+            <span class="source-name">Rewind</span>
+            <span class="source-count">${frames.length} captures</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          class="source${view === 'conversations' ? ' is-active' : ''}"
+          data-action="open-conversations"
+        >
+          <span class="source-icon">${ICON_CONV}</span>
+          <span class="source-body">
+            <span class="source-name">Conversations</span>
+            <span class="source-count">${conversations.length} recorded</span>
+          </span>
+        </button>
       </div>
       <footer class="rail-foot">
         <p class="watching"><span class="watch-dot" aria-hidden="true"></span>Watching screen</p>
@@ -537,29 +538,54 @@ function suggestionsHtml(): string {
   return `<ul class="suggestions" role="listbox" aria-label="Suggestions">${items}</ul>`;
 }
 
+/** The one input bar is shared by every page; in a conversation or in Rewind it
+ *  asks a question about what you are looking at instead of adding to the book. */
+function convMode(): boolean {
+  return view === 'conversations' && openConvId !== null;
+}
+function rewindMode(): boolean {
+  return view === 'rewind';
+}
+
 function counterHtml(): string {
+  const ask = convMode() || rewindMode();
+  const placeholder = convMode()
+    ? 'Ask about this conversation'
+    : rewindMode()
+      ? 'Ask about what you saw'
+      : 'Tell Omi what you owe, or ask where you stand';
+  const hint = ask ? 'press ↵ to ask' : 'hold right ⌘ to speak';
   const reply =
     omiThinking && !draft
       ? `<p class="omi-reply is-thinking" role="status"><span class="omi-dots" aria-hidden="true"><i></i><i></i><i></i></span></p>`
       : omiLine && !draft
         ? `<p class="omi-reply" role="status">${omiLine}</p>`
         : '';
+  const answering = (omiThinking || omiLine) && !draft;
+  const pills = convMode() ? CONV_QUESTIONS : REWIND_QUESTIONS;
+  const above = ask
+    ? answering
+      ? reply
+      : askPillsHtml(pills)
+    : draft
+      ? draftHtml(draft)
+      : answering
+        ? reply
+        : suggestionsHtml();
   return `
-    <footer class="counter${listening ? ' is-listening' : ''}">
-      ${draft ? draftHtml(draft) : ''}
-      ${reply}
-      ${draft || omiThinking || omiLine ? '' : suggestionsHtml()}
+    <footer class="counter${listening ? ' is-listening' : ''}${ask ? ' is-ask' : ''}">
+      ${above}
       <form class="counter-form" data-action="counter">
         <input
           class="counter-input"
           type="text"
           value="${counterText.replace(/"/g, '&quot;')}"
-          placeholder="Tell Omi what you owe, or ask where you stand"
-          aria-label="Tell Omi what you owe, or ask where you stand"
+          placeholder="${placeholder}"
+          aria-label="${placeholder}"
           autocomplete="off"
           spellcheck="false"
         />
-        <span class="counter-hint">hold right ⌘ to speak</span>
+        <span class="counter-hint">${hint}</span>
       </form>
       <div class="counter-ink" aria-hidden="true"><span class="counter-ink-fill"></span></div>
     </footer>`;
@@ -731,8 +757,7 @@ function segTime(iso: string): string {
 
 function turnHtml(seg: Conversation['segments'][number]): string {
   const isReceipt = seg.id === openSegId;
-  const last = convThread[convThread.length - 1];
-  const isCited = Boolean(last && !last.streaming && last.a.citeSegmentId === seg.id);
+  const isCited = seg.id === citedSegId;
   const mine = seg.speaker === 'Riley Park';
   return `
     <li class="turn${mine ? ' turn-mine' : ''}${isReceipt ? ' is-receipt' : ''}${isCited ? ' is-cited' : ''}" data-seg="${seg.id}">
@@ -741,29 +766,11 @@ function turnHtml(seg: Conversation['segments'][number]): string {
     </li>`;
 }
 
-function threadHtml(): string {
-  if (!convThread.length) {
-    return `
-      <div class="ask-suggest">
-        ${CONV_QUESTIONS.map((q) => `<button type="button" class="ask-chip" data-action="ask-q" data-q="${q.replace(/"/g, '&quot;')}">${q}</button>`).join('')}
-      </div>`;
-  }
+function askPillsHtml(questions: readonly string[]): string {
   return `
-    <ol class="ask-thread">
-      ${convThread
-        .map(
-          (t) => `
-        <li class="ask-turn">
-          <p class="ask-q">${t.q}</p>
-          <p class="ask-a${t.streaming && !t.a.text ? ' is-thinking' : ''}">${
-            t.streaming && !t.a.text
-              ? `<span class="omi-dots" aria-hidden="true"><i></i><i></i><i></i></span>`
-              : t.a.text
-          }</p>
-        </li>`,
-        )
-        .join('')}
-    </ol>`;
+    <div class="ask-suggest">
+      ${questions.map((q) => `<button type="button" class="ask-chip" data-action="ask-q" data-q="${q.replace(/"/g, '&quot;')}">${q}</button>`).join('')}
+    </div>`;
 }
 
 function trackedCount(convId: string): number {
@@ -805,9 +812,12 @@ function convDetailHtml(conv: Conversation): string {
   return `
     <main class="pane conv-pane conv-detail">
       <header class="pane-head conv-detail-head">
-        <button type="button" class="link-btn conv-back" data-action="close-reader">← All conversations</button>
         <h2 class="pane-title">${conv.title}</h2>
-        <p class="pane-summary">${convDateLabel(conv)} · ${convPeopleLabel(conv)}</p>
+        <p class="conv-detail-sub">
+          <button type="button" class="link-btn conv-back" data-action="close-reader">← All conversations</button>
+          <span class="conv-detail-dot" aria-hidden="true">·</span>
+          <span class="conv-detail-meta">${convDateLabel(conv)} · ${convPeopleLabel(conv)}</span>
+        </p>
       </header>
       <div class="conv-detail-body">
         <section class="reader-block">
@@ -818,24 +828,7 @@ function convDetailHtml(conv: Conversation): string {
           <h3 class="reader-label">Transcript</h3>
           <ol class="turns">${conv.segments.map(turnHtml).join('')}</ol>
         </section>
-        <section class="reader-block reader-asked">
-          <h3 class="reader-label">Ask</h3>
-          ${threadHtml()}
-        </section>
       </div>
-      <footer class="reader-ask">
-        <form class="ask-form" data-action="ask-conv">
-          <input
-            class="ask-input"
-            type="text"
-            placeholder="Ask about this conversation"
-            aria-label="Ask about this conversation"
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <button type="submit" class="ask-send" aria-label="Ask">Ask</button>
-        </form>
-      </footer>
     </main>`;
 }
 
@@ -848,7 +841,7 @@ function openConversation(convId: string, segId: string | null): void {
   view = 'conversations';
   openConvId = convId;
   openSegId = segId;
-  convThread = [];
+  citedSegId = null;
   selected = null;
   expandedId = null;
   openFrameId = null;
@@ -857,41 +850,35 @@ function openConversation(convId: string, segId: string | null): void {
   target?.scrollIntoView({ block: 'center' });
 }
 
+/**
+ * Asking about the open conversation answers in the same line above the input
+ * that every page uses; the page-specific act is surfacing the cited transcript
+ * turn (highlight + scroll into view).
+ */
 function askConversation(question: string): void {
   const conv = convById(openConvId);
   if (!conv) return;
   const q = question.trim();
   if (!q) return;
-  stopStream();
+  counterText = '';
   const answer = answerAboutConversation(conv, q);
-  convThread.push({ q, a: { text: '', citeSegmentId: answer.citeSegmentId }, streaming: true });
   openSegId = null;
-  render();
+  citedSegId = answer.citeSegmentId;
+  streamOmiReply(answer.text);
+  root!.querySelector<HTMLElement>('.turn.is-cited')?.scrollIntoView({ block: 'center' });
+}
 
-  streamTimer = window.setTimeout(() => {
-    const words = answer.text.split(/(\s+)/).filter(Boolean);
-    let i = 0;
-    const tick = () => {
-      i += 1;
-      const partial = words.slice(0, i).join('');
-      const last = convThread[convThread.length - 1];
-      if (last) last.a = { text: partial, citeSegmentId: answer.citeSegmentId };
-      const el = root!.querySelector<HTMLElement>('.ask-thread .ask-turn:last-child .ask-a');
-      if (el) {
-        el.classList.remove('is-thinking');
-        el.textContent = partial;
-      } else render();
-      if (i >= words.length) {
-        if (last) last.streaming = false;
-        streamTimer = undefined;
-        render();
-        root!.querySelector<HTMLElement>('.turn.is-cited')?.scrollIntoView({ block: 'center' });
-        return;
-      }
-      streamTimer = window.setTimeout(tick, 36);
-    };
-    tick();
-  }, 680);
+/** Same shared reply line; the page-specific act is bringing the cited screen
+ *  capture to the surface (highlight + scroll into view). */
+function askRewind(question: string): void {
+  const q = question.trim();
+  if (!q) return;
+  counterText = '';
+  const answer = answerAboutRewind(rewindFrames(currentEntries()), q);
+  openFrameId = null;
+  citedFrameId = answer.citeFrameId;
+  streamOmiReply(answer.text);
+  root!.querySelector<HTMLElement>('.frame.is-cited')?.scrollIntoView({ block: 'center' });
 }
 
 /* ---------------------------------------------------------------------- *
@@ -932,6 +919,7 @@ function streamTranscript(heard: string): void {
 
 const unbindPtt = pushToTalk({
   onPress: () => {
+    if (convMode() || rewindMode()) return; // speech dictates book lines only
     listening = true;
     counterText = '';
     const heard = HEARD_LINES[heardIndex % HEARD_LINES.length]!;
@@ -942,6 +930,7 @@ const unbindPtt = pushToTalk({
     void voice.start();
   },
   onRelease: () => {
+    if (!listening) return;
     voice.stop();
     listening = false;
     if (transcribeTimer) {
@@ -1003,7 +992,8 @@ function handleAction(t: HTMLElement): void {
     openFrameId = null;
     openConvId = null;
     openSegId = null;
-    convThread = [];
+    citedSegId = null;
+    citedFrameId = null;
     expandedId = null;
     render();
     return;
@@ -1015,6 +1005,7 @@ function handleAction(t: HTMLElement): void {
     expandedId = null;
     openFrameId = null;
     openConvId = null;
+    citedFrameId = null;
     render();
     return;
   }
@@ -1026,7 +1017,7 @@ function handleAction(t: HTMLElement): void {
     openFrameId = null;
     openConvId = null;
     openSegId = null;
-    convThread = [];
+    citedSegId = null;
     render();
     return;
   }
@@ -1038,6 +1029,7 @@ function handleAction(t: HTMLElement): void {
     selected = null;
     expandedId = null;
     openConvId = null;
+    citedFrameId = null;
     render();
     root!.querySelector<HTMLElement>(`.frame.is-open`)?.scrollIntoView({ block: 'nearest' });
     return;
@@ -1072,7 +1064,7 @@ function handleAction(t: HTMLElement): void {
   if (t.closest('[data-action="close-reader"]')) {
     openConvId = null;
     openSegId = null;
-    convThread = [];
+    citedSegId = null;
     view = 'conversations';
     render();
     return;
@@ -1080,7 +1072,8 @@ function handleAction(t: HTMLElement): void {
 
   const askQ = t.closest<HTMLElement>('[data-action="ask-q"]');
   if (askQ) {
-    askConversation(askQ.dataset.q ?? '');
+    if (rewindMode()) askRewind(askQ.dataset.q ?? '');
+    else askConversation(askQ.dataset.q ?? '');
     return;
   }
 
@@ -1127,12 +1120,15 @@ function handleCannedKey(event: KeyboardEvent, input: HTMLInputElement): void {
   if (PASSTHROUGH_KEYS.has(event.key)) return;
   event.preventDefault();
 
-  const line = SUGGESTIONS[cannedIndex % SUGGESTIONS.length]!;
+  const script = convMode() ? CONV_QUESTIONS : rewindMode() ? REWIND_QUESTIONS : SUGGESTIONS;
+  const line = script[cannedIndex % script.length]!;
 
   if (event.key === 'Enter') {
     cannedIndex += 1;
     cannedPos = 0;
-    submitUtterance(line);
+    if (convMode()) askConversation(line);
+    else if (rewindMode()) askRewind(line);
+    else submitUtterance(line);
     return;
   }
 
@@ -1183,18 +1179,14 @@ root!.addEventListener('input', (event) => {
 });
 
 root!.addEventListener('submit', (event) => {
-  const askForm = (event.target as HTMLElement).closest<HTMLFormElement>('[data-action="ask-conv"]');
-  if (askForm) {
-    event.preventDefault();
-    const input = askForm.querySelector<HTMLInputElement>('.ask-input');
-    askConversation(input?.value ?? '');
-    return;
-  }
   const form = (event.target as HTMLElement).closest<HTMLFormElement>('[data-action="counter"]');
   if (!form) return;
   event.preventDefault();
   const raw = counterText.trim();
-  if (raw) submitUtterance(raw);
+  if (!raw) return;
+  if (convMode()) askConversation(raw);
+  else if (rewindMode()) askRewind(raw);
+  else submitUtterance(raw);
 });
 
 document.addEventListener('keydown', (event) => {
@@ -1202,8 +1194,14 @@ document.addEventListener('keydown', (event) => {
   if (openConvId) {
     openConvId = null;
     openSegId = null;
-    convThread = [];
+    citedSegId = null;
     view = 'conversations';
+    render();
+    return;
+  }
+  if (citedFrameId || citedSegId) {
+    citedFrameId = null;
+    citedSegId = null;
     render();
     return;
   }

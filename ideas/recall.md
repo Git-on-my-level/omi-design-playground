@@ -24,7 +24,7 @@ The value has to be shown *inside someone else's task*, or it reads as a search 
 4. The answer lands twice at once, split by role:
    - **In the document:** ghost text at the caret, grey, sentence-cased into the user's own prose — the phrase ready to accept.
    - **Beside the window:** a compact dark card, notch pointing at the line, with the verbatim quote in italic serif and the receipt: `PRIYA SHAH — CLIENT DISCOVERY — JUL 14`.
-5. **The beat that sells it: Tab or Enter.** The ghost text commits into the document with a brief highlight, the card dissolves, and the user is still mid-sentence. Or they **type a different line in the app** — the card flips to “Noted,” receipt becomes *Learned from you*, and the correction is the new memory. Esc — or being ignored — dismisses everything without a trace.
+5. **The beat that sells it: Tab or Enter.** The ghost text commits into the document with a brief highlight, the card dissolves, and the user is still mid-sentence. Or they **type their own line in the app** — the recalled quote stays up as they write, and on dismiss the card flips to “Noted,” receipt becomes *Learned from you*, and the typed words are the new memory. Esc — or being ignored — dismisses everything without a trace.
 
 The same hold works in a second app (Messages): switch from the dock, ask about Morgan, and the completion lands in the chat composer instead. Cross-app is the point — Recall follows the caret, not a window of its own.
 

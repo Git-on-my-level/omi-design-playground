@@ -105,8 +105,9 @@ body {
 .sources {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin: 0.35rem 0 0.5rem;
+  gap: 3px;
+  padding: 0.55rem 0.75rem;
+  border-top: 1px solid var(--rule-soft);
 }
 
 .source {
@@ -208,6 +209,10 @@ body {
 .account.is-selected {
   background: var(--paper-raise);
   box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.account-list-lead {
+  margin-top: 0.5rem;
 }
 
 .account-all {
@@ -906,6 +911,23 @@ body {
   border-color: var(--ink-soft);
 }
 
+.frame.is-cited .frame-node {
+  background: var(--credit);
+  border-color: var(--credit);
+  box-shadow: 0 0 0 4px rgba(47, 90, 67, 0.18);
+}
+
+.frame.is-cited .shot {
+  outline: 1px solid var(--credit);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 18px 38px -16px rgba(20, 24, 33, 0.75);
+}
+
+.frame.is-cited .frame-at {
+  color: var(--credit);
+}
+
 .frame-hit {
   display: block;
   width: 100%;
@@ -1102,8 +1124,7 @@ body {
   animation: detail-in 200ms ease-out;
 }
 
-.omi-reply.is-thinking,
-.ask-a.is-thinking {
+.omi-reply.is-thinking {
   font-style: normal;
 }
 
@@ -1382,12 +1403,28 @@ body {
   overflow: hidden;
 }
 
-.conv-detail-head .pane-title {
-  margin-top: 0.35rem;
+.conv-detail-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 
-.conv-back {
-  margin-bottom: 0.15rem;
+.conv-detail-sub {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.conv-detail-dot {
+  color: var(--ink-faint);
+}
+
+.conv-detail-meta {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
 }
 
 .conv-detail-body {
@@ -1397,8 +1434,7 @@ body {
   padding-bottom: 1rem;
 }
 
-.ask-chip:focus-visible,
-.ask-send:focus-visible {
+.ask-chip:focus-visible {
   outline: 1px solid var(--ink);
   outline-offset: 2px;
 }
@@ -1483,24 +1519,14 @@ body {
   border-left-color: var(--credit);
 }
 
-.reader-asked:empty {
-  display: none;
-}
-
-/* —— Ask about this conversation —— */
-
-.reader-ask {
-  flex: none;
-  margin: 0 -0.25rem;
-  padding: 0.9rem 0.25rem 0.15rem;
-  border-top: 1px solid var(--rule);
-  background: var(--paper);
-}
+/* —— Ask pills: quick prompts that ride above the shared input bar —— */
 
 .ask-suggest {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+  max-width: 46rem;
+  margin-bottom: 0.7rem;
 }
 
 .ask-chip {
@@ -1517,78 +1543,6 @@ body {
 .ask-chip:hover {
   border-color: var(--ink-soft);
   color: var(--ink);
-}
-
-.ask-thread {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.ask-turn + .ask-turn {
-  margin-top: 1rem;
-}
-
-.ask-q {
-  margin: 0 0 0.3rem;
-  font-family: var(--mono);
-  font-size: 0.6875rem;
-  letter-spacing: 0.03em;
-  color: var(--ink-faint);
-}
-
-.ask-a {
-  margin: 0;
-  font-size: 0.9375rem;
-  line-height: 1.55;
-  color: var(--ink);
-  text-wrap: pretty;
-}
-
-.ask-form {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.ask-input {
-  flex: 1;
-  min-width: 0;
-  padding: 0.2rem 0;
-  border: 0;
-  border-bottom: 1px solid var(--rule);
-  background: none;
-  font-family: var(--serif);
-  font-size: 0.9375rem;
-  color: var(--ink);
-}
-
-.ask-input:focus {
-  outline: none;
-  border-bottom-color: var(--ink-soft);
-}
-
-.ask-input::placeholder {
-  color: var(--ink-faint);
-  font-style: italic;
-}
-
-.ask-send {
-  flex: none;
-  padding: 0.3rem 0.85rem;
-  border: 1px solid var(--ink);
-  border-radius: 999px;
-  background: none;
-  font-family: var(--mono);
-  font-size: 0.625rem;
-  letter-spacing: 0.06em;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.ask-send:hover {
-  background: var(--ink);
-  color: var(--paper);
 }
 
 @media (max-width: 760px) {

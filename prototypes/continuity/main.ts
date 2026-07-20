@@ -26,16 +26,42 @@ const stage = mountMacStage(root, {
 
 type AppId = 'browser' | 'slack' | 'notes';
 
+interface Loop {
+  title: string;
+  meta: string;
+  when: string;
+}
+interface Decision {
+  when: string;
+  text: string;
+}
+interface Artifact {
+  icon: string;
+  title: string;
+  meta: string;
+}
+
 interface Context {
   app: string;
   dock: string;
   project: string;
   phase: string;
+  status: string;
   where: string;
   next?: string;
   question: string;
   answer: string;
   thumb: string;
+  // Folio (the fuller workstream view inside Omi)
+  hero: string;
+  state: string;
+  stateNext: string;
+  goal?: string;
+  goalDate?: string;
+  loops: Loop[];
+  decisions: Decision[];
+  artifacts: Artifact[];
+  unfiled?: boolean;
 }
 
 const CONTEXTS: Record<AppId, Context> = {
@@ -44,37 +70,83 @@ const CONTEXTS: Record<AppId, Context> = {
     dock: 'Arc',
     project: 'Atlas launch',
     phase: 'Positioning',
+    status: 'Active now',
     where: 'You were comparing activation claims.',
     next: 'Resolve the 14-day metric before copy lock.',
     question: 'What was unresolved here?',
     answer:
       'The launch draft says activation improved in 14 days. Priya’s workshop notes use 30 days. You wanted to confirm the analytics definition before keeping the claim.',
     thumb: 'Launch draft',
+    hero: 'Make returning to complex work feel immediate.',
+    state:
+      'The launch narrative is nearly locked. One proof point still conflicts with the workshop definition.',
+    stateNext: 'Confirm whether activation is measured at 14 or 30 days.',
+    goal: 'Approve positioning before Friday’s launch review.',
+    goalDate: 'Fri 24 Jul',
+    loops: [
+      { title: 'Resolve the activation window', meta: 'Launch draft · Priya’s comment', when: 'Today' },
+    ],
+    decisions: [
+      { when: 'Today', text: 'Lead with continuity, not memory capture.' },
+      { when: 'Wed', text: 'Do not require tool migration.' },
+    ],
+    artifacts: [
+      { icon: 'A', title: 'Launch narrative', meta: 'Arc · focused now' },
+      { icon: '#', title: 'atlas-launch', meta: 'Slack · 35 min ago' },
+    ],
   },
   slack: {
     app: 'Slack',
     dock: 'Slack',
-    project: 'Atlas launch',
+    project: 'Atlas pilot',
     phase: 'Pilot decision',
+    status: 'Waiting on Priya',
     where: 'Priya is waiting on the workshop decision.',
     next: 'Send the narrower pilot scope.',
     question: 'What do I owe Priya?',
     answer:
       'Send the smaller pilot scope and the decision trail. You said you would do it before tomorrow’s review.',
     thumb: '#atlas-launch',
+    hero: 'Ship the pilot at the size the team can support.',
+    state: 'Priya wants to close the pilot shape today. You favor the smaller cohort.',
+    stateNext: 'Send the narrower scope with the decision trail.',
+    goal: 'Hand Priya the scope before tomorrow’s review.',
+    goalDate: 'Tue 21 Jul',
+    loops: [
+      { title: 'Send Priya the narrower pilot scope', meta: 'Slack · #atlas-launch', when: 'Today' },
+    ],
+    decisions: [
+      { when: 'Fri', text: 'Keep the pilot to one product team.' },
+      { when: 'Mon', text: 'Measure activation at 14 days, pending analytics.' },
+    ],
+    artifacts: [
+      { icon: '#', title: 'atlas-launch', meta: 'Slack · active thread' },
+      { icon: 'A', title: 'Launch narrative', meta: 'Arc · linked' },
+    ],
   },
   notes: {
     app: 'Notes',
     dock: 'Notes',
-    project: 'Unassigned',
-    phase: 'Scratch',
+    project: 'Context should travel',
+    phase: 'Loose note',
+    status: 'Unfiled',
     where: 'No workstream linked.',
     question: 'What is this note about?',
     answer:
       'It looks like an early thought about making project context portable across apps. It is not linked to a workstream yet.',
     thumb: 'Context should travel',
+    hero: 'Context should travel',
+    state:
+      'A loose thought captured in Notes. It isn’t part of a workstream yet — Omi can start one from it.',
+    stateNext: '',
+    loops: [],
+    decisions: [],
+    artifacts: [{ icon: '✎', title: 'Context should travel', meta: 'Notes · 10:42' }],
+    unfiled: true,
   },
 };
+
+const SIDEBAR_ORDER: AppId[] = ['browser', 'slack', 'notes'];
 
 const APP_ORDER: AppId[] = ['notes', 'browser', 'slack'];
 const openApps = new Set<AppId>(APP_ORDER);
@@ -180,28 +252,21 @@ const marker = document.createElement('aside');
 marker.className = 'continuity-marker';
 marker.setAttribute('aria-live', 'polite');
 marker.innerHTML = `
-  <span class="marker-thread" aria-hidden="true"></span>
-  <div class="marker-stack">
-    <button class="marker-main" type="button" aria-label="Open current workstream in Omi">
-      <span class="marker-meta"></span>
-      <strong class="marker-project"></strong>
-      <span class="marker-where"></span>
-      <span class="marker-next"></span>
-    </button>
-    <div class="marker-answer" hidden>
-      <p class="marker-q"></p>
-      <p class="marker-a"></p>
-      <div class="marker-actions">
-        <input class="marker-followup" aria-label="Ask a follow-up" placeholder="Ask a follow-up…" autocomplete="off">
-        <button class="marker-open" type="button">Open in omi</button>
-      </div>
-    </div>
-    <button class="marker-ptt" type="button" aria-label="Ask Omi about this screen">
-      <span class="marker-orb" aria-hidden="true"></span>
-      <span class="marker-key">⌘</span>
-      <span class="marker-heard"></span>
-    </button>
+  <button class="marker-main" type="button" aria-label="Open current workstream in Omi">
+    <span class="marker-meta"></span>
+    <strong class="marker-project"></strong>
+    <span class="marker-where"></span>
+    <span class="marker-next"></span>
+  </button>
+  <div class="marker-answer" hidden>
+    <p class="marker-q"></p>
+    <p class="marker-a"></p>
+    <button class="marker-open" type="button">Open in omi<span aria-hidden="true">↗</span></button>
   </div>
+  <button class="marker-ptt" type="button" aria-label="Hold Command to ask Omi about this screen">
+    <span class="marker-cue"><kbd>⌘</kbd><span class="cue-label">Hold to ask</span></span>
+    <span class="marker-heard"></span>
+  </button>
 `;
 stage.surface.append(marker);
 
@@ -220,59 +285,25 @@ omiWindow.innerHTML = `
   </header>
   <div class="omi-shell">
     <aside class="omi-sidebar">
-      <div class="omi-mark"><span></span>omi</div>
-      <nav aria-label="Workstreams">
-        <button class="is-current"><span class="nav-dot"></span>Atlas launch<small>active now</small></button>
-        <button><span class="nav-dot"></span>Website refresh<small>2 open loops</small></button>
-        <button><span class="nav-dot"></span>Research<small>quiet</small></button>
-      </nav>
-      <button class="all-context"><span>⌘</span> All context</button>
+      <div class="omi-mark">omi</div>
+      <p class="omi-nav-label">Workstreams</p>
+      <nav class="omi-nav" aria-label="Workstreams"></nav>
+      <button class="all-context">All context</button>
     </aside>
     <article class="project-folio">
-      <div class="folio-body">
-        <header class="project-head">
-          <p class="project-kicker">Atlas launch <span>·</span> Positioning</p>
-          <h1>Make returning to complex work feel immediate.</h1>
-          <p class="project-status"><span></span>In focus across Arc and Slack</p>
+      <div class="folio-body"></div>
+      <section class="ask-thread" aria-label="Conversation with Omi" hidden>
+        <header class="ask-thread-head">
+          <span class="ask-thread-title">omi</span>
+          <button type="button" class="ask-clear">Clear</button>
         </header>
-        <div class="folio-grid">
-          <section class="current-state">
-            <h2>Where you are</h2>
-            <p class="state-line">The launch narrative is nearly locked. One proof point still conflicts with the workshop definition.</p>
-            <p class="state-next"><span>Next</span> Confirm whether activation is measured at 14 or 30 days.</p>
-          </section>
-          <aside class="goal">
-            <h2>Goal</h2>
-            <p>Approve positioning and pilot scope before Friday’s launch review.</p>
-            <time>Fri 24 Jul</time>
-          </aside>
-          <section class="open-loops">
-            <h2>Open loops <span>2</span></h2>
-            <button><i></i><span><strong>Resolve the activation window</strong><small>Launch draft · Priya’s comment</small></span><em>Today</em></button>
-            <button><i></i><span><strong data-fixture-action>Send Priya the narrower pilot scope</strong><small>Slack · #atlas-launch</small></span><em>Tomorrow</em></button>
-          </section>
-          <section class="decisions">
-            <h2>Decisions</h2>
-            <p><time>Today</time><span>Lead with continuity, not memory capture.</span></p>
-            <p><time>Fri</time><span>Keep the pilot to one product team.</span></p>
-            <p><time>Wed</time><span>Do not require tool migration.</span></p>
-          </section>
-          <section class="artifacts">
-            <h2>Context <span>5</span></h2>
-            <button><span class="artifact-icon">A</span><span><strong>Launch narrative</strong><small>Arc · focused now</small></span></button>
-            <button><span class="artifact-icon">#</span><span><strong>atlas-launch</strong><small>Slack · 35 min ago</small></span></button>
-          </section>
-        </div>
-      </div>
-      <div class="folio-dock">
-        <div class="chat-log" aria-live="polite"></div>
-        <form class="omi-chat">
-          <span class="chat-orb" aria-hidden="true"></span>
-          <input aria-label="Ask Omi" placeholder="Ask across this workstream" autocomplete="off">
-          <span class="chat-hint">hold <kbd>⌘</kbd> to talk</span>
-          <button type="submit" aria-label="Send">↑</button>
-        </form>
-      </div>
+        <div class="ask-log" aria-live="polite"></div>
+      </section>
+      <form class="ask-composer">
+        <input aria-label="Ask Omi" placeholder="Ask across this workstream" autocomplete="off">
+        <span class="ask-hint">hold <kbd>⌘</kbd> to talk</span>
+        <button type="submit" class="ask-send" aria-label="Send">↑</button>
+      </form>
     </article>
   </div>
 `;
@@ -291,15 +322,20 @@ const markerMeta = marker.querySelector<HTMLElement>('.marker-meta')!;
 const markerWhere = marker.querySelector<HTMLElement>('.marker-where')!;
 const markerNext = marker.querySelector<HTMLElement>('.marker-next')!;
 const markerHeard = marker.querySelector<HTMLElement>('.marker-heard')!;
-const markerOrb = marker.querySelector<HTMLElement>('.marker-orb')!;
+const markerPtt = marker.querySelector<HTMLElement>('.marker-ptt')!;
 const answerPanel = marker.querySelector<HTMLElement>('.marker-answer')!;
 const markerQ = marker.querySelector<HTMLElement>('.marker-q')!;
 const markerA = marker.querySelector<HTMLElement>('.marker-a')!;
-const markerFollowup = marker.querySelector<HTMLInputElement>('.marker-followup')!;
 const markerOpen = marker.querySelector<HTMLButtonElement>('.marker-open')!;
-const chatLog = omiWindow.querySelector<HTMLElement>('.chat-log')!;
-const chatForm = omiWindow.querySelector<HTMLFormElement>('.omi-chat')!;
-const chatInput = chatForm.querySelector<HTMLInputElement>('input')!;
+const folioBody = omiWindow.querySelector<HTMLElement>('.folio-body')!;
+const omiNav = omiWindow.querySelector<HTMLElement>('.omi-nav')!;
+const askThread = omiWindow.querySelector<HTMLElement>('.ask-thread')!;
+const askLog = omiWindow.querySelector<HTMLElement>('.ask-log')!;
+const askComposer = omiWindow.querySelector<HTMLFormElement>('.ask-composer')!;
+const chatInput = askComposer.querySelector<HTMLInputElement>('input')!;
+const askClear = omiWindow.querySelector<HTMLButtonElement>('.ask-clear')!;
+
+let omiView: AppId = 'browser';
 
 let active: AppId = 'browser';
 const offsets = new Map<AppId, { x: number; y: number }>();
@@ -441,21 +477,139 @@ function closeApp(id: AppId): void {
   }
 }
 
+function buildSidebar(): void {
+  omiNav.innerHTML = SIDEBAR_ORDER.map((id) => {
+    const c = CONTEXTS[id];
+    return `<button type="button" class="ws${id === omiView ? ' is-current' : ''}" data-ws="${id}">
+      <span class="ws-name">${c.project}</span>
+      <span class="ws-status">${c.status}</span>
+    </button>`;
+  }).join('');
+}
+
+/** Paint the folio for one workstream. Unfiled notes get a teaching empty state. */
+function renderFolio(id: AppId): void {
+  omiView = id;
+  const c = CONTEXTS[id];
+  omiNav.querySelectorAll<HTMLButtonElement>('[data-ws]').forEach((b) => {
+    b.classList.toggle('is-current', b.dataset.ws === id);
+  });
+
+  const head = `
+    <header class="folio-head">
+      <p class="folio-kicker">${c.project} · ${c.phase}</p>
+      <h1>${c.hero}</h1>
+      <p class="folio-status">${c.status}</p>
+    </header>`;
+
+  if (c.unfiled) {
+    folioBody.innerHTML = `${head}
+      <section class="folio-empty">
+        <p>${c.state}</p>
+        <div class="folio-empty-actions">
+          <button type="button" class="folio-primary">Start a workstream</button>
+          <button type="button" class="folio-ghost">Link to Atlas launch</button>
+        </div>
+      </section>`;
+    return;
+  }
+
+  const loops = c.loops
+    .map(
+      (l) => `<button type="button" class="loop">
+        <span class="loop-check" aria-hidden="true"></span>
+        <span class="loop-copy"><strong${id === 'slack' ? ' data-fixture-action' : ''}>${l.title}</strong><small>${l.meta}</small></span>
+        <em>${l.when}</em>
+      </button>`,
+    )
+    .join('');
+  const decisions = c.decisions
+    .map((d) => `<li><time>${d.when}</time><span>${d.text}</span></li>`)
+    .join('');
+  const artifacts = c.artifacts
+    .map(
+      (a) => `<button type="button" class="artifact">
+        <span class="artifact-icon">${a.icon}</span>
+        <span class="artifact-copy"><strong>${a.title}</strong><small>${a.meta}</small></span>
+      </button>`,
+    )
+    .join('');
+
+  folioBody.innerHTML = `${head}
+    <div class="folio-lede">
+      <section class="folio-section folio-now">
+        <h2>Where you are</h2>
+        <p class="now-line">${c.state}</p>
+        ${c.stateNext ? `<p class="now-next"><span>Next</span>${c.stateNext}</p>` : ''}
+      </section>
+      ${
+        c.goal
+          ? `<aside class="folio-goal">
+        <h2>Goal</h2>
+        <p>${c.goal}</p>
+        <time>${c.goalDate ?? ''}</time>
+      </aside>`
+          : ''
+      }
+    </div>
+    <section class="folio-section">
+      <h2>Open loops</h2>
+      <div class="loops">${loops || '<p class="folio-none">Nothing open.</p>'}</div>
+    </section>
+    <section class="folio-section">
+      <h2>Decisions</h2>
+      <ul class="decisions">${decisions}</ul>
+    </section>
+    <section class="folio-section">
+      <h2>Linked context</h2>
+      <div class="artifacts">${artifacts}</div>
+    </section>`;
+}
+
+function clearThread(): void {
+  stopStream();
+  askLog.innerHTML = '';
+  askThread.hidden = true;
+}
+
+/** A real conversation surface, distinct from the workstream brief. */
+function ask(question: string): void {
+  askThread.hidden = false;
+  const you = document.createElement('div');
+  you.className = 'bubble bubble-you';
+  you.textContent = question;
+  const reply = document.createElement('div');
+  reply.className = 'bubble bubble-omi';
+  reply.innerHTML = '<span class="bubble-who">omi</span><span class="bubble-text"></span>';
+  askLog.append(you, reply);
+  askLog.scrollTop = askLog.scrollHeight;
+  thinkThenStream(reply.querySelector<HTMLElement>('.bubble-text')!, CONTEXTS[omiView].answer);
+  window.setTimeout(() => {
+    askLog.scrollTop = askLog.scrollHeight;
+  }, 500);
+}
+
 function openOmi(asking?: string): void {
   dismissAnswer();
+  renderFolio(active);
+  chatInput.placeholder = `Ask across ${CONTEXTS[active].project}`;
   omiWindow.classList.add('is-open');
   marker.classList.add('is-app-open');
   setMenuApp('omi', ['File', 'Edit', 'View', 'Window', 'Help']);
   placeMarker();
   syncDock();
-  if (asking) addExchange(asking, CONTEXTS[active].answer);
-  window.setTimeout(() => chatInput.focus(), 240);
+  if (asking) ask(asking);
+  else {
+    clearThread();
+    window.setTimeout(() => chatInput.focus(), 240);
+  }
 }
 
 function closeOmi(): void {
   if (!omiWindow.classList.contains('is-open')) return;
   omiWindow.classList.remove('is-open');
   marker.classList.remove('is-app-open');
+  clearThread();
   if (openApps.has(active)) setMenuApp(CONTEXTS[active].app, MENUS[active]);
   placeMarker();
   syncDock();
@@ -471,7 +625,7 @@ function stopStream(): void {
 /** Thinking beat, then word-by-word reveal — the cadence of an agent, not a dump. */
 function thinkThenStream(el: HTMLElement, text: string): void {
   stopStream();
-  el.innerHTML = '<span class="think-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
+  el.innerHTML = '<span class="think-skel" aria-hidden="true"></span>';
   streamTimer = window.setTimeout(() => {
     el.textContent = '';
     const words = text.split(/(\s+)/).filter(Boolean);
@@ -489,15 +643,6 @@ function thinkThenStream(el: HTMLElement, text: string): void {
   }, 460);
 }
 
-function addExchange(question: string, answer: string): void {
-  chatLog.innerHTML = `
-    <p class="chat-question"></p>
-    <p class="chat-answer"><span class="chat-bar"></span><span class="chat-text"></span></p>
-  `;
-  chatLog.querySelector<HTMLElement>('.chat-question')!.textContent = question;
-  thinkThenStream(chatLog.querySelector<HTMLElement>('.chat-text')!, answer);
-}
-
 /** Answer lands in the overlay; Omi only opens if the user dives deeper. */
 function showAnswer(question: string, answer: string): void {
   markerQ.textContent = question;
@@ -513,7 +658,6 @@ function dismissAnswer(): void {
   stopStream();
   answerPanel.hidden = true;
   marker.classList.remove('is-answered');
-  markerFollowup.value = '';
 }
 
 strip.addEventListener('click', (event) => {
@@ -614,21 +758,30 @@ marker.querySelector<HTMLButtonElement>('.marker-ptt')!.addEventListener('click'
   const ctx = CONTEXTS[active];
   showAnswer(ctx.question, ctx.answer);
 });
-// Ingress + follow-up both escalate the in-place answer into the full app.
+// The overlay answers by voice only; typing a follow-up means opening the full app.
 markerOpen.addEventListener('click', () => openOmi(markerQ.textContent || undefined));
-markerFollowup.addEventListener('keydown', (event) => {
-  if (event.key !== 'Enter') return;
-  event.preventDefault();
-  const followup = markerFollowup.value.trim();
-  openOmi(followup || markerQ.textContent || undefined);
-});
 
-chatForm.addEventListener('submit', (event) => {
+askComposer.addEventListener('submit', (event) => {
   event.preventDefault();
   const question = chatInput.value.trim();
   if (!question) return;
-  addExchange(question, CONTEXTS[active].answer);
+  ask(question);
   chatInput.value = '';
+});
+
+omiNav.addEventListener('click', (event) => {
+  const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-ws]');
+  if (!btn?.dataset.ws) return;
+  const id = btn.dataset.ws as AppId;
+  if (id === omiView) return;
+  clearThread();
+  renderFolio(id);
+  chatInput.placeholder = `Ask across ${CONTEXTS[id].project}`;
+});
+
+askClear.addEventListener('click', () => {
+  clearThread();
+  chatInput.focus();
 });
 
 /* Dock: wire demo apps; glyphs are CSS/SVG shapes, not letter placeholders. */
@@ -710,7 +863,7 @@ root.querySelector('.stage-dock')?.addEventListener('click', (event) => {
 });
 
 const voice = createVoiceInput({
-  onLevel: ({ level }) => markerOrb.style.setProperty('--level', level.toFixed(3)),
+  onLevel: ({ level }) => markerPtt.style.setProperty('--level', level.toFixed(3)),
 });
 let listeningSince = 0;
 let wordTimer: number | undefined;
@@ -755,8 +908,10 @@ function hydrateFixture(snapshot: OmiSnapshot): void {
   const priyaAction = snapshot.actions.find(
     (action) => action.status === 'open' && action.title.toLowerCase().includes('priya'),
   );
-  const target = omiWindow.querySelector<HTMLElement>('[data-fixture-action]');
-  if (priyaAction && target) target.textContent = priyaAction.title;
+  if (priyaAction && CONTEXTS.slack.loops[0]) {
+    CONTEXTS.slack.loops[0].title = priyaAction.title;
+    if (omiWindow.classList.contains('is-open') && omiView === 'slack') renderFolio('slack');
+  }
 }
 
 function selfCheck(): void {
@@ -773,6 +928,8 @@ window.addEventListener('resize', placeMarker);
 // Re-anchor once the answered-state width transition settles, so the wider
 // panel never hangs past the screen edge.
 marker.addEventListener('transitionend', placeMarker);
+buildSidebar();
+renderFolio('browser');
 setActive('browser');
 selfCheck();
 void omi.getSnapshot().then(hydrateFixture);
