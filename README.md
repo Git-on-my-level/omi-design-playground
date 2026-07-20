@@ -15,6 +15,8 @@ Then serve a prototype from the repository root:
 
 ```bash
 ./scripts/serve-prototype.sh hello-world
+./scripts/serve-prototype.sh desk
+./scripts/serve-prototype.sh attention
 ```
 
 The command prints a local URL (normally `http://127.0.0.1:5173`).
@@ -23,7 +25,9 @@ The command prints a local URL (normally `http://127.0.0.1:5173`).
 
 ```text
 prototypes/
-  hello-world/        First working desktop/mobile example
+  hello-world/        Tiny smoke-test surface
+  desk/               Capture → thread → carry-forward desk concept
+  attention/          Proactive “what needs you” concept
   <concept-name>/     One self-contained concept per directory
 reference/
   hackathon-pack/     Unmodified supplied mock SDK, docs, and example harness

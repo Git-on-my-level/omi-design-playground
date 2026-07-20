@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>omi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="wash" aria-hidden="true"></div>
+
+    <div class="app">
+      <header class="mast">
+        <p class="brand">omi</p>
+        <div class="mast-right">
+          <p id="clock" class="clock"></p>
+          <p id="device" class="device" aria-live="polite"></p>
+        </div>
+      </header>
+
+      <main id="stage" class="stage" aria-live="polite">
+        <p class="eyebrow" id="eyebrow">Needs your attention</p>
+        <h1 id="primary-title">Loading…</h1>
+        <p id="primary-meta" class="meta"></p>
+        <p id="primary-reason" class="reason"></p>
+
+        <div id="primary-actions" class="cta-row" hidden>
+          <button id="done-button" type="button">Mark done</button>
+          <button id="next-button" type="button" class="ghost">Skip to next</button>
+        </div>
+
+        <section id="context" class="context" hidden>
+          <h2>Context</h2>
+          <p id="context-summary"></p>
+          <ul id="context-memories"></ul>
+        </section>
+      </main>
+
+      <section class="queue" aria-labelledby="queue-title">
+        <div class="queue-head">
+          <h2 id="queue-title">Also waiting</h2>
+          <p id="queue-count" class="queue-count"></p>
+        </div>
+        <ol id="queue-list"></ol>
+        <p id="queue-empty" class="queue-empty" hidden>Nothing else is waiting.</p>
+      </section>
+
+      <footer class="foot">
+        <label class="scenario">
+          Fixture
+          <select id="scenario"></select>
+        </label>
+        <p>Proactive attention surface · synthetic pack data</p>
+      </footer>
+    </div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

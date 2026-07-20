@@ -5,6 +5,7 @@ prototype="${1:-hello-world}"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 prototype_dir="${repo_root}/prototypes/${prototype}"
 vite_bin="${repo_root}/reference/hackathon-pack/node_modules/.bin/vite"
+vite_config="${repo_root}/scripts/vite.prototype.config.mjs"
 
 if [[ ! -d "${prototype_dir}" ]]; then
   echo "Unknown prototype: ${prototype}" >&2
@@ -19,4 +20,6 @@ if [[ ! -x "${vite_bin}" ]]; then
   exit 1
 fi
 
-exec "${vite_bin}" "${prototype_dir}" --host 127.0.0.1
+export OMI_PROTOTYPE_DIR="${prototype_dir}"
+cd "${repo_root}/reference/hackathon-pack"
+exec "${vite_bin}" --config "${vite_config}" --host 127.0.0.1
