@@ -9,7 +9,7 @@ A brief is written before `prototypes/<name>/` exists. It names the thesis, the 
 | Idea | Thesis | Register |
 |---|---|---|
 | [Threshold](./threshold.md) | The twenty seconds before you walk into the room. | Warm dark, display serif, one card |
-| [Filament](./filament.md) | The whole app is 22 pixels tall. | System-native monochrome, motion-only |
+| [Filament](./filament.md) *(rejected)* | The whole app is 22 pixels tall. | System-native monochrome, motion-only |
 | [Ledger](./ledger.md) | You are in debt to four people. Here is the balance. | Ink on paper, monospace tabular |
 | [Live Margin](./live-margin.md) | The transcript is not the artifact. The understanding is. | Vellum overlay, editorial serif |
 | [Mirror](./mirror.md) | Arrives Monday. Tells you what actually happened to the project. | Swiss annual report, gridded |
@@ -44,11 +44,12 @@ pieces of shared infrastructure the rest of these can use: `_macos-stage` (deskt
 
 Remaining:
 
-1. **Filament** — small surface, but all the effort lands in motion craft. Cheap to build, expensive to imitate.
-2. **Live Margin** — strongest single demo moment (the revision), but needs a fake macOS desktop and a hand-timed script.
-3. **Field** — highest ceiling, highest risk. Only worth it if drag-to-connect gets built first.
-4. **Mirror** — most content-dependent; its quality is mostly copywriting, and the Quiet section has a real tone hazard.
+1. **Live Margin** — strongest single demo moment (the revision), but needs a fake macOS desktop and a hand-timed script.
+2. **Field** — highest ceiling, highest risk. Only worth it if drag-to-connect gets built first.
+3. **Mirror** — most content-dependent; its quality is mostly copywriting, and the Quiet section has a real tone hazard.
 
 ## Cut
+
+**Filament** — built as [prototypes/filament](../prototypes/filament), then rejected. The menu-bar-only surface is a coherent thesis, but too thin as a walk-up demo: if you miss the glyph, there is no product. Expanding it into a browsable window would just make a small `desk`. Kept for the record; not the next bet.
 
 **Shutter** — a consent and privacy instrument: visible recording state, per-person boundaries, scrub-back-and-forget. Strong concept, but it lives on the device rather than in a macOS app. Cut for scope, not for quality; worth revisiting if hardware surfaces come into range.

@@ -1,5 +1,7 @@
 # Filament
 
+> **Rejected.** Built, then cut: too thin as a walk-up demo, and growing it would abandon the thesis. See [prototypes/filament](../prototypes/filament) and the Cut section in [README.md](./README.md).
+
 > The whole app is 22 pixels tall.
 
 ## Thesis
