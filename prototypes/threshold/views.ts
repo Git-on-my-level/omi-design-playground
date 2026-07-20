@@ -1,24 +1,42 @@
 /**
- * Tasks and contact views.
+ * Tasks, and the two lenses onto them.
  *
- * The whole reason these are one file: a task row and a person chip look and
- * behave identically wherever they appear, because they are literally the same
- * function. Tasks tie to people, people tie to goals, goals tie back to tasks,
- * and every one of those edges is clickable. If a row rendered differently on
- * the contact page than on the tasks page, the tie would stop reading as a tie.
+ * There is one substrate here — the task list — and everything else is a way of
+ * looking at it. Goals and people are not places you go and read about; they
+ * are *dimensions*. You can group tasks by either, filter to one of either, and
+ * the page you land on is always the same page wearing a different header.
+ *
+ * That is what keeps this simple while staying rich. A CRM and a project
+ * tracker usually disagree about which object is primary; here neither is. The
+ * commitment is primary, and a person or a goal is a question you ask about it.
+ *
+ * Omi's part is the receipt: every task can show the verbatim line that
+ * produced it. No other tracker can do that, and it is the reason to trust a
+ * list you did not type.
  */
 import type { Memory, MemoryKind } from '../../reference/hackathon-pack/src/types';
 import { firstName, initials, relativeDays, type GoalView, type PersonView, type TaskView, type Workspace } from './workspace';
 
-/** Where a click can send you. The shell owns the actual navigation. */
 export interface Nav {
+  /** Tasks, lensed on one person. */
   person(id: string): void;
-  tasks(goalId?: string): void;
+  /** Tasks, lensed on one goal. */
+  goal(id: string): void;
+  tasks(): void;
+  goals(): void;
+  people(): void;
   ask(question: string): void;
 }
 
+export interface Lens {
+  goalId?: string;
+  personId?: string;
+}
+
+type Grouping = 'goal' | 'person' | 'due';
+
 /* ---------------------------------------------------------------------- *
- * Shared pieces
+ * Chips
  * ---------------------------------------------------------------------- */
 
 export function personChip(view: PersonView, nav: Nav): HTMLElement {
@@ -33,131 +51,288 @@ export function personChip(view: PersonView, nav: Nav): HTMLElement {
   return chip;
 }
 
-export interface TaskRowOptions {
-  /** Contact pages already say who it is; the tasks page does not. */
+function goalChip(goal: GoalView, nav: Nav): HTMLElement {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = 'gchip';
+  chip.textContent = goal.title;
+  chip.addEventListener('click', (event) => {
+    event.stopPropagation();
+    nav.goal(goal.id);
+  });
+  return chip;
+}
+
+/* ---------------------------------------------------------------------- *
+ * Task row
+ * ---------------------------------------------------------------------- */
+
+interface TaskRowOptions {
   showPerson?: boolean;
-  /** The tasks page groups by goal, so repeating it there is noise. */
   showGoal?: boolean;
 }
 
 export function taskRow(task: TaskView, workspace: Workspace, nav: Nav, options: TaskRowOptions = {}): HTMLElement {
-  const row = document.createElement('div');
-  row.className = `task${task.action.status === 'done' ? ' is-done' : ''}`;
+  const wrap = document.createElement('div');
+  wrap.className = `task${task.action.status === 'done' ? ' is-done' : ''}${task.overdue ? ' is-overdue' : ''}`;
 
   const meta: string[] = [];
   if (task.action.status === 'open' && task.dueLabel) meta.push(task.dueLabel);
   if (task.source) meta.push(task.source.title);
 
-  row.innerHTML = `
-    <button class="task-check" type="button" aria-label="Toggle complete"></button>
-    <div class="task-body">
-      <p class="task-title">${task.action.title}</p>
-      <p class="task-meta">${meta.join(' · ')}</p>
+  wrap.innerHTML = `
+    <div class="task-row">
+      <button class="task-check" type="button" aria-label="Toggle complete"></button>
+      <div class="task-body">
+        <p class="task-title">${task.action.title}</p>
+        <p class="task-meta">${meta.join(' · ')}</p>
+      </div>
+      <div class="task-tail"></div>
     </div>
-    <div class="task-tail"></div>
+    <div class="task-receipt" data-receipt></div>
   `;
 
-  const tail = row.querySelector<HTMLElement>('.task-tail')!;
-  if (options.showGoal) {
-    const goal = document.createElement('button');
-    goal.type = 'button';
-    goal.className = 'gchip';
-    goal.textContent = task.goal.title;
-    goal.addEventListener('click', () => nav.tasks(task.goal.id));
-    tail.append(goal);
-  }
+  const tail = wrap.querySelector<HTMLElement>('.task-tail')!;
+  if (options.showGoal) tail.append(goalChip(task.goal, nav));
   if (options.showPerson && task.person) {
     const view = workspace.personById.get(task.person.id);
     if (view) tail.append(personChip(view, nav));
   }
-  if (task.overdue) row.classList.add('is-overdue');
 
-  const check = row.querySelector<HTMLButtonElement>('.task-check')!;
-  check.addEventListener('click', () => row.classList.toggle('is-done'));
+  wrap.querySelector<HTMLButtonElement>('.task-check')!.addEventListener('click', (event) => {
+    event.stopPropagation();
+    wrap.classList.toggle('is-done');
+  });
 
-  return row;
+  /* The receipt. Every claim can show the line it came from. */
+  const segments = task.source?.segments ?? [];
+  if (segments.length > 0) {
+    wrap.classList.add('has-receipt');
+    const slot = wrap.querySelector<HTMLElement>('[data-receipt]')!;
+    slot.innerHTML = `
+      <p class="receipt-src">${task.source!.title} · ${relativeDays(task.source!.startedAt)}</p>
+      ${segments
+        .slice(0, 3)
+        .map((s) => `<p class="receipt-l"><span>${s.speaker}:</span> ${s.text}</p>`)
+        .join('')}
+    `;
+    wrap.querySelector<HTMLElement>('.task-row')!.addEventListener('click', () => {
+      const open = wrap.classList.toggle('is-open');
+      slot.style.height = open ? `${slot.scrollHeight}px` : '0px';
+    });
+  }
+
+  return wrap;
+}
+
+/* ---------------------------------------------------------------------- *
+ * Grouping
+ * ---------------------------------------------------------------------- */
+
+interface Group {
+  key: string;
+  title: string;
+  note?: string;
+  count: string;
+  tasks: TaskView[];
+  open?(): void;
+}
+
+const DUE_BUCKETS = ['Overdue', 'Due today', 'Due tomorrow', 'This week', 'Later', 'No date'];
+
+function dueBucket(task: TaskView): string {
+  if (!task.action.dueAt) return 'No date';
+  if (task.overdue) return 'Overdue';
+  const label = task.dueLabel ?? '';
+  if (label === 'Due today') return 'Due today';
+  if (label === 'Due tomorrow') return 'Due tomorrow';
+  const days = Number(label.replace(/\D/g, ''));
+  return days <= 7 ? 'This week' : 'Later';
+}
+
+function group(tasks: TaskView[], by: Grouping, workspace: Workspace, nav: Nav): Group[] {
+  const openCount = (list: TaskView[]): string =>
+    `${list.filter((t) => t.action.status === 'open').length} open`;
+
+  if (by === 'goal') {
+    return workspace.goals
+      .map((goal) => ({
+        key: goal.id,
+        title: goal.title,
+        note: goal.intent,
+        count: openCount(goal.tasks.filter((t) => tasks.includes(t))),
+        tasks: tasks.filter((task) => task.goal.id === goal.id),
+        open: () => nav.goal(goal.id),
+      }))
+      .filter((g) => g.tasks.length > 0);
+  }
+
+  if (by === 'person') {
+    const groups: Group[] = workspace.people
+      .map((view) => ({
+        key: view.person.id,
+        title: view.person.name,
+        note: view.person.relationship,
+        count: openCount(tasks.filter((task) => task.person?.id === view.person.id)),
+        tasks: tasks.filter((task) => task.person?.id === view.person.id),
+        open: () => nav.person(view.person.id),
+      }))
+      .filter((g) => g.tasks.length > 0);
+
+    const unassigned = tasks.filter((task) => !task.person);
+    if (unassigned.length > 0) {
+      groups.push({
+        key: 'nobody',
+        title: 'No one named',
+        note: 'Commitments you made to yourself.',
+        count: openCount(unassigned),
+        tasks: unassigned,
+      });
+    }
+    return groups;
+  }
+
+  return DUE_BUCKETS.map((bucket) => ({
+    key: bucket,
+    title: bucket,
+    count: openCount(tasks.filter((task) => dueBucket(task) === bucket)),
+    tasks: tasks.filter((task) => dueBucket(task) === bucket),
+  })).filter((g) => g.tasks.length > 0);
 }
 
 /* ---------------------------------------------------------------------- *
  * Tasks
  * ---------------------------------------------------------------------- */
 
-export function renderTasks(workspace: Workspace, nav: Nav, focusGoalId?: string): HTMLElement {
-  const view = document.createElement('div');
-  view.className = 'view view-tasks';
+export function renderTasks(workspace: Workspace, nav: Nav, lens: Lens = {}): HTMLElement {
+  const page = document.createElement('div');
+  page.className = 'view';
 
-  const openTotal = workspace.tasks.filter((task) => task.action.status === 'open').length;
+  const goal = lens.goalId ? workspace.goals.find((g) => g.id === lens.goalId) : undefined;
+  const person = lens.personId ? workspace.personById.get(lens.personId) : undefined;
 
-  view.innerHTML = `
-    <header class="view-head">
-      <div>
-        <h1 class="view-title">Tasks</h1>
-        <p class="view-sub">${openTotal} open across ${workspace.goals.length} goals</p>
-      </div>
-      <div class="seg" role="tablist">
-        <button class="seg-item is-on" type="button" data-filter="open">Open</button>
-        <button class="seg-item" type="button" data-filter="all">All</button>
-      </div>
-    </header>
-    <div class="goals" data-goals></div>
-  `;
+  const scoped = workspace.tasks.filter((task) => {
+    if (goal && task.goal.id !== goal.id) return false;
+    if (person && task.person?.id !== person.person.id) return false;
+    return true;
+  });
 
-  const list = view.querySelector<HTMLElement>('[data-goals]')!;
+  /*
+   * Looking through one dimension, you group by the other — a goal asks "who
+   * owes what", a person asks "toward what". Unlensed, goals are the frame.
+   */
+  let grouping: Grouping = goal ? 'person' : person ? 'goal' : 'goal';
   let filter: 'open' | 'all' = 'open';
 
+  page.append(lensHeader(goal, person, workspace, nav));
+
+  const controls = document.createElement('div');
+  controls.className = 'controls';
+  controls.innerHTML = `
+    <div class="ctl">
+      <span class="ctl-label">Group by</span>
+      <div class="seg">
+        <button class="seg-item" type="button" data-group="goal">Goal</button>
+        <button class="seg-item" type="button" data-group="person">Person</button>
+        <button class="seg-item" type="button" data-group="due">Due</button>
+      </div>
+    </div>
+    <div class="seg">
+      <button class="seg-item is-on" type="button" data-filter="open">Open</button>
+      <button class="seg-item" type="button" data-filter="all">All</button>
+    </div>
+  `;
+  page.append(controls);
+
+  const list = document.createElement('div');
+  list.className = 'groups';
+  page.append(list);
+
   function paint(): void {
+    for (const button of controls.querySelectorAll<HTMLElement>('[data-group]')) {
+      button.classList.toggle('is-on', button.dataset.group === grouping);
+    }
+
+    const visible = scoped.filter((task) => filter === 'all' || task.action.status === 'open');
     list.replaceChildren();
-    const goals = focusGoalId ? workspace.goals.filter((goal) => goal.id === focusGoalId) : workspace.goals;
 
-    for (const goal of goals) {
-      const tasks = goal.tasks.filter((task) => filter === 'all' || task.action.status === 'open');
-      if (tasks.length === 0) continue;
+    if (visible.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'empty';
+      empty.textContent = filter === 'open' ? 'Nothing open here.' : 'Nothing here yet.';
+      list.append(empty);
+      return;
+    }
 
-      const block = document.createElement('section');
-      block.className = 'goal';
-      block.innerHTML = `
-        <header class="goal-head">
-          <div class="goal-heading">
-            <h2 class="goal-title">${goal.title}</h2>
-            <p class="goal-intent">${goal.intent}</p>
+    for (const block of group(visible, grouping, workspace, nav)) {
+      const section = document.createElement('section');
+      section.className = 'grp';
+      section.innerHTML = `
+        <header class="grp-head">
+          <div class="grp-heading">
+            <h2 class="grp-title"></h2>
+            ${block.note ? `<p class="grp-note">${block.note}</p>` : ''}
           </div>
-          <span class="goal-count">${goal.open} open</span>
+          <span class="grp-count">${block.count}</span>
         </header>
-        <div class="goal-bar" aria-hidden="true">
-          <span style="width:${Math.round((goal.done / goal.tasks.length) * 100)}%"></span>
-        </div>
-        <div class="goal-tasks" data-tasks></div>
+        <div class="grp-tasks"></div>
       `;
 
-      const taskSlot = block.querySelector<HTMLElement>('[data-tasks]')!;
-      for (const task of tasks) taskSlot.append(taskRow(task, workspace, nav, { showPerson: true }));
+      const heading = section.querySelector<HTMLElement>('.grp-title')!;
+      if (block.open) {
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'grp-link';
+        link.textContent = block.title;
+        link.addEventListener('click', block.open);
+        heading.append(link);
+      } else {
+        heading.textContent = block.title;
+      }
 
-      list.append(block);
+      const slot = section.querySelector<HTMLElement>('.grp-tasks')!;
+      for (const task of block.tasks) {
+        slot.append(
+          taskRow(task, workspace, nav, {
+            showPerson: grouping !== 'person' && !person,
+            showGoal: grouping !== 'goal' && !goal,
+          }),
+        );
+      }
+
+      list.append(section);
     }
   }
 
-  for (const button of view.querySelectorAll<HTMLButtonElement>('[data-filter]')) {
+  for (const button of controls.querySelectorAll<HTMLButtonElement>('[data-group]')) {
+    button.addEventListener('click', () => {
+      grouping = (button.dataset.group as Grouping) ?? 'goal';
+      paint();
+    });
+  }
+  for (const button of controls.querySelectorAll<HTMLButtonElement>('[data-filter]')) {
     button.addEventListener('click', () => {
       filter = button.dataset.filter === 'all' ? 'all' : 'open';
-      for (const other of view.querySelectorAll('.seg-item')) other.classList.toggle('is-on', other === button);
+      for (const other of controls.querySelectorAll('[data-filter]')) {
+        other.classList.toggle('is-on', other === button);
+      }
       paint();
     });
   }
 
   paint();
-  return view;
+  return page;
 }
 
 /* ---------------------------------------------------------------------- *
- * Contact
+ * The header is the lens
+ *
+ * Same page, three headers. Unlensed it is a title; through a goal it carries
+ * the intent and progress; through a person it carries the relationship and
+ * what you know — which is the only place Omi's memory belongs, since it is
+ * context for the commitments below it rather than a page of its own.
  * ---------------------------------------------------------------------- */
 
-/*
- * `memory.people` means "involved in this", not "this is about them" — a
- * preference of Riley's recorded in a conversation with Morgan carries both
- * ids. Labelling that group "Preferences" on Morgan's page silently asserts it
- * is Morgan's. These labels state the relationship the data actually supports.
- */
 const KIND_LABEL: Record<MemoryKind, string> = {
   relationship: 'How you work together',
   preference: 'Preferences that came up',
@@ -166,115 +341,175 @@ const KIND_LABEL: Record<MemoryKind, string> = {
   insight: 'Insights',
 };
 
-const KIND_ORDER: MemoryKind[] = ['relationship', 'preference', 'commitment', 'insight', 'fact'];
+function lensHeader(
+  goal: GoalView | undefined,
+  person: PersonView | undefined,
+  workspace: Workspace,
+  nav: Nav,
+): HTMLElement {
+  const head = document.createElement('header');
+  head.className = 'lens';
 
-export function renderContact(view: PersonView, workspace: Workspace, nav: Nav): HTMLElement {
-  const page = document.createElement('div');
-  page.className = 'view view-contact';
+  if (goal) {
+    head.classList.add('lens-goal');
+    head.innerHTML = `
+      <button class="lens-back" type="button">Tasks</button>
+      <h1 class="lens-title">${goal.title}</h1>
+      <p class="lens-sub">${goal.intent}</p>
+      <div class="lens-bar"><i style="width:${Math.round((goal.done / goal.tasks.length) * 100)}%"></i></div>
+      <p class="lens-stats">${goal.open} open · ${goal.done} done</p>
+      <div class="lens-chips"></div>
+    `;
+    const chips = head.querySelector<HTMLElement>('.lens-chips')!;
+    for (const p of goal.people) {
+      const view = workspace.personById.get(p.id);
+      if (view) chips.append(personChip(view, nav));
+    }
+    if (goal.people.length === 0) chips.remove();
+    head.querySelector<HTMLElement>('.lens-back')!.addEventListener('click', () => nav.tasks());
+    return head;
+  }
 
-  const open = view.tasks.filter((task) => task.action.status === 'open');
-  const stats = [
-    `${open.length} open`,
-    `${view.memories.length} memories`,
-    `${view.conversations.length} conversations`,
-  ].join(' · ');
-
-  page.innerHTML = `
-    <header class="contact-head">
-      <span class="contact-face">${initials(view.person.name)}</span>
-      <div class="contact-id">
-        <h1 class="contact-name">${view.person.name}</h1>
-        <p class="contact-rel">${view.person.relationship}</p>
-        <p class="contact-stats">${view.lastSpoke ? `Last spoke ${view.lastSpoke} · ` : ''}${stats}</p>
+  if (person) {
+    head.classList.add('lens-person');
+    const openCount = person.tasks.filter((t) => t.action.status === 'open').length;
+    head.innerHTML = `
+      <button class="lens-back" type="button">Tasks</button>
+      <div class="lens-id">
+        <span class="lens-face">${initials(person.person.name)}</span>
+        <div class="lens-idtext">
+          <h1 class="lens-title">${person.person.name}</h1>
+          <p class="lens-sub">${person.person.relationship}${person.lastSpoke ? ` · last spoke ${person.lastSpoke}` : ''}</p>
+        </div>
+        <button class="lens-ask" type="button">Ask about ${firstName(person.person)}</button>
       </div>
-      <button class="contact-ask" type="button" data-ask>Ask about ${firstName(view.person)}</button>
+      <p class="lens-stats">${openCount} open · ${person.memories.length} memories · ${person.conversations.length} conversations</p>
+      <div class="know" data-know></div>
+    `;
+
+    /* What you know: context for the list, not a page. Two lines, then more. */
+    const know = head.querySelector<HTMLElement>('[data-know]')!;
+    const ordered: MemoryKind[] = ['relationship', 'preference', 'insight', 'commitment', 'fact'];
+    const sorted = [...person.memories].sort(
+      (a, b) => ordered.indexOf(a.kind) - ordered.indexOf(b.kind),
+    );
+    const render = (memory: Memory): string =>
+      `<p class="know-line"><span>${KIND_LABEL[memory.kind]}</span>${memory.text}</p>`;
+
+    know.innerHTML = sorted.slice(0, 2).map(render).join('');
+    if (sorted.length > 2) {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'know-more';
+      more.textContent = `${sorted.length - 2} more`;
+      more.addEventListener('click', () => {
+        know.innerHTML = sorted.map(render).join('');
+      });
+      know.append(more);
+    }
+
+    head.querySelector<HTMLElement>('.lens-back')!.addEventListener('click', () => nav.tasks());
+    head.querySelector<HTMLElement>('.lens-ask')!.addEventListener('click', () => {
+      nav.ask(`What should I know before I talk to ${firstName(person.person)}?`);
+    });
+    return head;
+  }
+
+  const open = workspace.tasks.filter((task) => task.action.status === 'open').length;
+  head.innerHTML = `
+    <h1 class="lens-title">Tasks</h1>
+    <p class="lens-sub">${open} open across ${workspace.goals.length} goals and ${workspace.people.filter((p) => p.tasks.length > 0).length} people</p>
+  `;
+  return head;
+}
+
+/* ---------------------------------------------------------------------- *
+ * Goals
+ * ---------------------------------------------------------------------- */
+
+export function renderGoals(workspace: Workspace, nav: Nav): HTMLElement {
+  const page = document.createElement('div');
+  page.className = 'view';
+  page.innerHTML = `
+    <header class="lens">
+      <h1 class="lens-title">Goals</h1>
+      <p class="lens-sub">Derived from the conversations your commitments came out of.</p>
     </header>
-    <div class="contact-body" data-body></div>
+    <div class="cards" data-cards></div>
   `;
 
-  page.querySelector<HTMLButtonElement>('[data-ask]')!.addEventListener('click', () => {
-    nav.ask(`What should I know before I talk to ${firstName(view.person)}?`);
-  });
-
-  const body = page.querySelector<HTMLElement>('[data-body]')!;
-
-  function section(title: string, note?: string): HTMLElement {
-    const element = document.createElement('section');
-    element.className = 'csec';
-    element.innerHTML = `<h2 class="csec-title">${title}</h2>${note ? `<p class="csec-note">${note}</p>` : ''}`;
-    body.append(element);
-    return element;
-  }
-
-  /* -- what you owe them ---------------------------------------------- */
-
-  if (view.tasks.length > 0) {
-    const block = section('Open with them');
-    for (const task of view.tasks) block.append(taskRow(task, workspace, nav, { showGoal: true }));
-  }
-
-  /* -- the goals they touch ------------------------------------------- */
-
-  if (view.goals.length > 0) {
-    const block = section(
-      'Where they fit',
-      'Goals this person has commitments under.',
-    );
-    for (const goal of view.goals) block.append(goalCard(goal, nav));
-  }
-
-  /* -- what you know ---------------------------------------------------- */
-
-  if (view.memories.length > 0) {
-    const block = section('What you know', 'From conversations that included them.');
-    const grouped = new Map<MemoryKind, Memory[]>();
-    for (const memory of view.memories) {
-      grouped.set(memory.kind, [...(grouped.get(memory.kind) ?? []), memory]);
+  const cards = page.querySelector<HTMLElement>('[data-cards]')!;
+  for (const goal of workspace.goals) {
+    const next = goal.tasks.find((task) => task.action.status === 'open');
+    const card = document.createElement('article');
+    card.className = 'card-row';
+    card.innerHTML = `
+      <div class="card-main">
+        <h2 class="card-title">${goal.title}</h2>
+        <p class="card-note">${goal.intent}</p>
+        ${next ? `<p class="card-next"><span>Next</span>${next.action.title}${next.dueLabel ? ` · ${next.dueLabel.toLowerCase()}` : ''}</p>` : ''}
+        <div class="card-chips"></div>
+      </div>
+      <div class="card-side">
+        <p class="card-count">${goal.open}</p>
+        <p class="card-count-label">open</p>
+        <div class="lens-bar"><i style="width:${Math.round((goal.done / goal.tasks.length) * 100)}%"></i></div>
+        <p class="card-done">${goal.done} of ${goal.tasks.length} done</p>
+      </div>
+    `;
+    const chips = card.querySelector<HTMLElement>('.card-chips')!;
+    for (const p of goal.people) {
+      const view = workspace.personById.get(p.id);
+      if (view) chips.append(personChip(view, nav));
     }
-    for (const kind of KIND_ORDER) {
-      const memories = grouped.get(kind);
-      if (!memories) continue;
-      const group = document.createElement('div');
-      group.className = 'mgroup';
-      group.innerHTML = `<p class="mgroup-label">${KIND_LABEL[kind]}</p>`;
-      for (const memory of memories) {
-        const line = document.createElement('p');
-        line.className = 'mline';
-        line.textContent = memory.text;
-        group.append(line);
-      }
-      block.append(group);
-    }
-  }
+    if (goal.people.length === 0) chips.remove();
 
-  /* -- history --------------------------------------------------------- */
-
-  if (view.conversations.length > 0) {
-    const block = section('Together');
-    for (const conversation of view.conversations.slice(0, 5)) {
-      const row = document.createElement('div');
-      row.className = 'conv';
-      row.innerHTML = `
-        <p class="conv-title">${conversation.title}</p>
-        <p class="conv-meta">${relativeDays(conversation.startedAt)} · ${conversation.segments.length} exchanges</p>
-        <p class="conv-sum">${conversation.summary}</p>
-      `;
-      block.append(row);
-    }
+    card.addEventListener('click', () => nav.goal(goal.id));
+    cards.append(card);
   }
 
   return page;
 }
 
-function goalCard(goal: GoalView, nav: Nav): HTMLElement {
-  const card = document.createElement('button');
-  card.type = 'button';
-  card.className = 'gcard';
-  card.innerHTML = `
-    <span class="gcard-title">${goal.title}</span>
-    <span class="gcard-meta">${goal.open} open · ${goal.done} done</span>
-    <span class="gcard-bar"><i style="width:${Math.round((goal.done / goal.tasks.length) * 100)}%"></i></span>
+/* ---------------------------------------------------------------------- *
+ * People
+ * ---------------------------------------------------------------------- */
+
+export function renderPeople(workspace: Workspace, nav: Nav): HTMLElement {
+  const page = document.createElement('div');
+  page.className = 'view';
+  const owed = workspace.people.filter((view) =>
+    view.tasks.some((task) => task.action.status === 'open'),
+  ).length;
+
+  page.innerHTML = `
+    <header class="lens">
+      <h1 class="lens-title">People</h1>
+      <p class="lens-sub">${owed} of ${workspace.people.length} have something open with you.</p>
+    </header>
+    <div class="rows" data-rows></div>
   `;
-  card.addEventListener('click', () => nav.tasks(goal.id));
-  return card;
+
+  const rows = page.querySelector<HTMLElement>('[data-rows]')!;
+  for (const view of workspace.people) {
+    const open = view.tasks.filter((task) => task.action.status === 'open').length;
+    const relationship = view.memories.find((memory) => memory.kind === 'relationship');
+
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'prow';
+    row.innerHTML = `
+      <span class="prow-face">${initials(view.person.name)}</span>
+      <span class="prow-main">
+        <span class="prow-name">${view.person.name}</span>
+        <span class="prow-rel">${view.person.relationship}${view.lastSpoke ? ` · last spoke ${view.lastSpoke}` : ''}</span>
+        ${relationship ? `<span class="prow-know">${relationship.text}</span>` : ''}
+      </span>
+      <span class="prow-tail">${open > 0 ? `<span class="prow-badge">${open} open</span>` : '<span class="prow-clear">clear</span>'}</span>
+    `;
+    row.addEventListener('click', () => nav.person(view.person.id));
+    rows.append(row);
+  }
+
+  return page;
 }

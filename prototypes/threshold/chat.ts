@@ -13,7 +13,7 @@
  */
 import type { Conversation, Memory } from '../../reference/hackathon-pack/src/types';
 import { createVoiceInput, pushToTalk } from '../_voice';
-import { renderContact, renderTasks, type Nav } from './views';
+import { renderGoals, renderPeople, renderTasks, type Nav } from './views';
 import { firstName, initials, type PersonView, type TaskView, type Workspace } from './workspace';
 
 export interface OmiAppOptions {
@@ -152,8 +152,8 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
       <nav class="side">
         <button class="side-item" type="button" data-nav="chat">Chat</button>
         <button class="side-item" type="button" data-nav="tasks">Tasks</button>
-        <p class="side-label">People</p>
-        <div class="side-people" data-people></div>
+        <button class="side-item" type="button" data-nav="goals">Goals</button>
+        <button class="side-item" type="button" data-nav="people">People</button>
       </nav>
       <div class="win-view" data-view></div>
     </div>
@@ -161,24 +161,6 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
 
   const titleEl = win.querySelector<HTMLElement>('[data-wintitle]')!;
   const viewHost = win.querySelector<HTMLElement>('[data-view]')!;
-  const peopleSlot = win.querySelector<HTMLElement>('[data-people]')!;
-
-  /* -- sidebar people -------------------------------------------------- */
-
-  for (const view of workspace.people) {
-    const open = view.tasks.filter((task) => task.action.status === 'open').length;
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'side-person';
-    item.dataset.person = view.person.id;
-    item.innerHTML = `
-      <span class="side-face">${initials(view.person.name)}</span>
-      <span class="side-name">${view.person.name}</span>
-      ${open > 0 ? `<span class="side-badge">${open}</span>` : ''}
-    `;
-    item.addEventListener('click', () => go({ view: 'person', personId: view.person.id }));
-    peopleSlot.append(item);
-  }
 
   /* -- chat view ------------------------------------------------------- */
 
@@ -320,7 +302,7 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
         <span class="ctx-kind">Contact</span>
       `;
       card.classList.add('is-linked');
-      card.addEventListener('click', () => go({ view: 'person', personId: view.person.id }));
+      card.addEventListener('click', () => go({ view: 'tasks', personId: view.person.id }));
       return card;
     }
 
@@ -350,14 +332,18 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
 
   type Route =
     | { view: 'chat' }
-    | { view: 'tasks'; goalId?: string }
-    | { view: 'person'; personId: string };
+    | { view: 'tasks'; goalId?: string; personId?: string }
+    | { view: 'goals' }
+    | { view: 'people' };
 
   let route: Route = { view: 'chat' };
 
   const nav: Nav = {
-    person: (id) => go({ view: 'person', personId: id }),
-    tasks: (goalId) => go({ view: 'tasks', goalId }),
+    person: (id) => go({ view: 'tasks', personId: id }),
+    goal: (id) => go({ view: 'tasks', goalId: id }),
+    tasks: () => go({ view: 'tasks' }),
+    goals: () => go({ view: 'goals' }),
+    people: () => go({ view: 'people' }),
     ask: (question) => {
       go({ view: 'chat' });
       addUser(question);
@@ -367,7 +353,8 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
 
   function go(next: Route): void {
     route = next;
-    if (next.view === 'person') {
+    // Looking at a person anywhere makes them the one chat is about.
+    if (next.view === 'tasks' && next.personId) {
       const view = workspace.personById.get(next.personId);
       if (view) focus = view;
     }
@@ -375,8 +362,10 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
     for (const item of win.querySelectorAll<HTMLElement>('.side-item')) {
       item.classList.toggle('is-on', item.dataset.nav === next.view);
     }
-    for (const item of win.querySelectorAll<HTMLElement>('.side-person')) {
-      item.classList.toggle('is-on', next.view === 'person' && item.dataset.person === next.personId);
+
+    if (next.view !== 'chat') {
+      thread = chips = input = undefined;
+      bars = [];
     }
 
     if (next.view === 'chat') {
@@ -384,22 +373,27 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
       viewHost.replaceChildren(buildChat());
       scrollToEnd();
     } else if (next.view === 'tasks') {
-      titleEl.textContent = 'Tasks';
-      thread = chips = input = undefined;
-      bars = [];
-      viewHost.replaceChildren(renderTasks(workspace, nav, next.goalId));
+      const person = next.personId ? workspace.personById.get(next.personId) : undefined;
+      const goal = next.goalId ? workspace.goals.find((g) => g.id === next.goalId) : undefined;
+      titleEl.textContent = person?.person.name ?? goal?.title ?? 'Tasks';
+      viewHost.replaceChildren(renderTasks(workspace, nav, { goalId: next.goalId, personId: next.personId }));
+    } else if (next.view === 'goals') {
+      titleEl.textContent = 'Goals';
+      viewHost.replaceChildren(renderGoals(workspace, nav));
     } else {
-      titleEl.textContent = focus.person.name;
-      thread = chips = input = undefined;
-      bars = [];
-      viewHost.replaceChildren(renderContact(focus, workspace, nav));
+      titleEl.textContent = 'People';
+      viewHost.replaceChildren(renderPeople(workspace, nav));
     }
     viewHost.scrollTop = 0;
   }
 
   for (const item of win.querySelectorAll<HTMLElement>('[data-nav]')) {
     item.addEventListener('click', () => {
-      go(item.dataset.nav === 'tasks' ? { view: 'tasks' } : { view: 'chat' });
+      const target = item.dataset.nav;
+      if (target === 'tasks') go({ view: 'tasks' });
+      else if (target === 'goals') go({ view: 'goals' });
+      else if (target === 'people') go({ view: 'people' });
+      else go({ view: 'chat' });
     });
   }
 

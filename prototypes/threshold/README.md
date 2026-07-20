@@ -21,15 +21,22 @@ Keyboard: `Enter` unfolds, `⌘Enter` opens the app, `Esc` throws the card away.
 
 ## The app
 
-Three views behind one sidebar.
+**There is one substrate — the task list — and everything else is a way of looking at it.**
 
-**Chat** is where you arrive, because a question is what you had. It opens with the person and the commitment as context cards, both of which are links.
+Goals and people are not places you go and read about; they are *dimensions*. You can group tasks by either, filter to one of either, and the page you land on is always the same page wearing a different header. A CRM and a project tracker usually disagree about which object is primary. Here neither is: the commitment is primary, and a person or a goal is a question you ask about it.
 
-**Tasks** groups all 20 actions under five goals, each with its intent, a completion bar, and rows that name the person involved and the conversation the commitment came from.
+- **Chat** — where you arrive, because a question is what you had. The person and the commitment are context cards, and both are links into the dimensions.
+- **Tasks** — the substrate. `Group by: Goal · Person · Due`, filtered `Open / All`.
+- **Goals** — five goal cards with progress, the next open task, and who is involved. Clicking one lenses Tasks onto it.
+- **People** — a CRM list: relationship, when you last spoke, the one line you know about them, and what is open. Clicking one lenses Tasks onto them.
 
-**Contact** is a person: what is open with them, which goals they sit under, what you know about them grouped by memory kind, and the conversations you have had.
+Two details worth trying:
 
-The ties are the point. A task belongs to a goal and may name a person; a person shows their tasks and their goals; a goal lists its tasks. A task row renders from the same function everywhere it appears, so the tie reads as a tie rather than as two similar lists.
+**Looking through one dimension groups by the other.** Lens on a goal and it groups by person — *who owes what*. Lens on a person and it groups by goal — *toward what*. Unlensed, goals are the frame.
+
+**Every task can show its receipt.** Click a task row and it unfolds the verbatim transcript lines that produced it, with the conversation and when it happened. This is the Omi part: no other tracker can do it, and it is the reason to trust a list you did not type.
+
+Memory lives in the person lens header — two lines, then "n more" — because it is context for the commitments below it rather than a page of its own.
 
 ## What it is not
 

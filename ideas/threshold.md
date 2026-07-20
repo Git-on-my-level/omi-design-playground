@@ -36,7 +36,11 @@ Threshold must never become browsable, but it cannot be a dead end either — th
 
 This is what keeps the concept honest. Threshold stays one card and one moment precisely *because* it has somewhere to hand off to.
 
-The app behind the door has three views — Chat, Tasks, and a contact page — and the thing worth stealing from it is that **every cross-reference is navigable in both directions**. A task belongs to a goal and may name a person; the person shows their tasks and the goals they sit under; the goal lists its tasks. Goals are derived from the conversations their commitments came out of, which is the only structure the fixture can honestly support.
+The app behind the door has one substrate and two lenses. **Tasks are the only objects; goals and people are dimensions you view them through.** You can group by either, filter to either, and the page never changes — only its header does.
+
+That is the correction that made it simple. The first build gave people their own expanded page: open items, goals, memories, conversation history, four stacked sections. It was a CRM record sitting next to a task tracker, and the two disagreed about which object was primary. Making a person a *lens* answers it — the commitment is primary, and a person is a question you ask about it. Memory survives as a compact context block in the lens header, which is the right size for it: it is what you need to know before you act on the list below, not a page to browse.
+
+Goals are derived from the conversations their commitments came out of, which is the only structure the fixture can honestly support. And every task can unfold its receipt — the verbatim line that produced it. That is the part no other tracker can copy.
 
 That density is exactly what the card must never become. The card is one fact; the app is the whole graph. Keeping them in one prototype is deliberate — it is the argument that an interruption earns its place by being *narrower* than the thing it can open, not by being a smaller copy of it.
 
