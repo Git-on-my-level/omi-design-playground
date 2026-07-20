@@ -81,26 +81,44 @@ export function createVoiceInput(options: VoiceInputOptions = {}): VoiceInput {
     }
   }
 
-  /** RMS of the current window, scaled so ordinary speech lands near 0.3–0.7. */
+  /**
+   * RMS of the current window on a compressive curve. Raw RMS is punishingly
+   * quiet — ordinary speech sits near 0.05 — so a linear scale gives a meter
+   * that barely leaves the floor. The exponent lifts conversational level into
+   * the middle of the range while leaving headroom for a shout.
+   */
   function micLevel(active: Extract<Source, { kind: 'mic' }>): number {
     active.analyser.getFloatTimeDomainData(active.buffer);
     let sum = 0;
     for (const sample of active.buffer) sum += sample * sample;
-    return Math.min(1, Math.sqrt(sum / active.buffer.length) * 6);
+    const rms = Math.sqrt(sum / active.buffer.length);
+    return Math.min(1, Math.pow(rms * 7.5, 0.62));
   }
 
   /**
-   * A plausible speech envelope: syllable-rate amplitude modulation under a
-   * slower phrase contour, with a breath-length gap. Deterministic, so
-   * screenshots of a listening state look the same every run.
+   * A plausible speech envelope, in four layers: syllable pulses, a faster
+   * grain riding on top, a slow phrase contour, and a breath gap between
+   * phrases. Deterministic, so a screenshot of a listening state looks the same
+   * every run.
+   *
+   * The rates are deliberately incommensurate — a single sine reads as a
+   * machine, because the pattern visibly repeats across a scrolling meter.
    */
   function simulatedLevel(active: Extract<Source, { kind: 'simulated' }>): number {
     const t = (performance.now() - active.startedAt) / 1000;
-    const syllables = 0.5 + 0.5 * Math.sin(t * 15.5);
-    const phrase = 0.55 + 0.45 * Math.sin(t * 1.7 + 0.6);
-    const breath = t % 4.2 > 3.7 ? 0.05 : 1;
-    const onset = Math.min(1, t * 4);
-    return Math.min(1, syllables * phrase * breath * onset * 0.85);
+    /*
+     * Rates are set against the *sampling window*, not against speech. A meter
+     * that scrolls one bar per frame shows ~0.4s of history, so a 1.5Hz
+     * syllable puts half a cycle on screen and reads as a static block. Around
+     * 7Hz puts three or four peaks in view, which is what makes it look like
+     * audio. Incommensurate rates keep the pattern from visibly repeating.
+     */
+    const syllable = Math.pow(Math.abs(Math.sin(t * 44)), 1.2);
+    const grain = 0.7 + 0.3 * Math.sin(t * 121 + 0.4);
+    const phrase = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 1.3 + 0.6));
+    const breath = t % 4.6 > 4.15 ? 0.05 : 1;
+    const onset = Math.min(1, t * 5);
+    return Math.min(1, syllable * grain * phrase * breath * onset);
   }
 
   function tick(): void {
@@ -112,12 +130,16 @@ export function createVoiceInput(options: VoiceInputOptions = {}): VoiceInput {
     lastFrameAt = now;
 
     /*
-     * Fast attack, slow release: meters should jump to a voice and ease off it.
-     * The coefficient is derived from elapsed time rather than assumed to be
-     * one frame — a meter that only converges at 60fps goes flat under a
-     * throttled tab or headless virtual time, which is where screenshots live.
+     * Fast attack, slightly slower release: meters should jump to a voice and
+     * ease off it. Both constants are short on purpose — syllables arrive
+     * around 5–10Hz, so a release much past ~60ms filters out exactly the
+     * modulation that makes a meter look alive, leaving a bar that hovers.
+     *
+     * Derived from elapsed time rather than assumed to be one frame: a meter
+     * that only converges at 60fps goes flat under a throttled tab or headless
+     * virtual time, which is where screenshots live.
      */
-    const tau = raw > smoothed ? 30 : 130;
+    const tau = raw > smoothed ? 8 : 22;
     smoothed += (raw - smoothed) * (1 - Math.exp(-dt / tau));
 
     if (smoothed > threshold) lastLoudAt = now;

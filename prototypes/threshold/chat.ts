@@ -318,8 +318,8 @@ export function openOmiChat(
     onLevel: ({ level }) => {
       history = [...history.slice(1), level];
       for (const [i, bar] of bars.entries()) {
-        const taper = Math.sin((i / (WAVE_BARS - 1)) * Math.PI) * 0.45 + 0.55;
-        bar.style.transform = `scaleY(${0.08 + history[i]! * taper * 0.92})`;
+        const taper = 0.72 + 0.28 * Math.min(1, i / 5);
+        bar.style.transform = `scaleY(${0.06 + history[i]! * taper * 0.94})`;
       }
     },
     onSpeechStart: () => win.classList.add('is-hearing'),

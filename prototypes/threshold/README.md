@@ -5,7 +5,7 @@
 A card arrives on its own because a meeting is close. It says the one thing it would cost you to have forgotten, and then it leaves. You never search, never navigate, and never see two cards at once.
 
 ```bash
-./scripts/serve-prototype.sh threshold
+make threshold
 ```
 
 ## Try first

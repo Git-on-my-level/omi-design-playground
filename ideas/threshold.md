@@ -55,11 +55,13 @@ Discipline: **the ember appears once**. If two things are urgent, the card is wr
 
 **Type** — display serif against a tight grotesque.
 
-- Display: **Instrument Serif**, 44–56px, `line-height: 1.05`, `letter-spacing: -0.02em`. The single fact.
-- Body/meta: **Inter Tight**, 13px, `letter-spacing: 0.01em`, uppercase only for the eyebrow (person + time-until).
-- Never more than **two type sizes visible at once**. The hierarchy is violent on purpose — one thing is 4× everything else.
+- Display: **Instrument Serif**, 25px, `line-height: 1.16`. The single fact.
+- Body/meta: **Inter Tight**, 10–11px, uppercase only for the eyebrow (person + time-until).
+- Never more than **two type sizes visible at once**. The hierarchy is violent on purpose — one thing is roughly 2.5× everything else, and it is the only serif on the card.
 
-**Space** — the card is `380px` wide, padding `32px`, and at least 40% of it is empty. Emptiness is the product claim: *we filtered for you.*
+**Space** — the card is `306px` wide with `18px/20px` padding, and the resting state is **three elements only**: the eyebrow, the fact, and a slim footer. Everything else — what she cares about, when you last spoke, the receipt — lives behind the fold.
+
+This is the correction that mattered most. The first build gave the fact 48px and put the supporting detail on the face of the card, which produced a 380×420 poster parked on your desktop. A surface that interrupts you has to earn its footprint, and a brief you read in six seconds does not need the area of a dialog. Compactness *is* the deference. The fact drops to 25px and still dominates, because everything around it is 10–11px.
 
 **Motion** — physical, weighted, never bouncy-cute.
 
@@ -68,7 +70,7 @@ Discipline: **the ember appears once**. If two things are urgent, the card is wr
 - Unfold: 280ms height + opacity, contents stagger 40ms apart.
 - Never pulse, never breathe. Threshold is not alive; it is punctual.
 
-**Material** — 24px radius, one soft ember-tinted shadow beneath. It sits *above* the desktop, not in a window.
+**Material** — 18px radius, one soft ember-tinted shadow beneath. It sits *above* the desktop, not in a window.
 
 The card is **real glass**: you can see the wallpaper move under it. That means the tint must stay thin (~0.3–0.42 alpha) and the backdrop must be *darkened before* the tint lands — `blur(26px) saturate(135%) brightness(0.6)`. Skipping the brightness step and thickening the tint instead produces something that merely looks like a dark card, which is the failure the translucency exists to avoid. The fact carries a soft text-shadow because the surface behind it is live.
 

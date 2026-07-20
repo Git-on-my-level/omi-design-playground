@@ -41,6 +41,19 @@ tells you which mode you are in. Do not put that fact on screen.
 
 Pass `simulate: true` to force the fallback while designing.
 
+## Tuning a meter
+
+Two numbers decide whether a meter looks alive, and both are about the **sampling window**
+rather than about speech:
+
+- A meter that scrolls one bar per frame shows only ~0.4s of history. A 1.5Hz syllable puts
+  half a cycle on screen and reads as a static block; ~7Hz puts three or four peaks in view.
+- Release smoothing much past ~30ms filters out exactly that modulation. The defaults here are
+  8ms attack / 22ms release for this reason.
+
+Raw mic RMS sits near 0.05 for ordinary speech, so a linear scale gives a meter that never
+leaves the floor. `micLevel` applies a compressive curve instead.
+
 ## Notes
 
 - `pushToTalk` keys off `KeyboardEvent.code`, so `MetaRight` really is the right ⌘ key.

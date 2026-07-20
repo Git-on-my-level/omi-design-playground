@@ -125,10 +125,9 @@ function buildBrief(person: Person, snapshot: OmiSnapshot): Brief | undefined {
     support.push({ label: 'Cares about', value: context.text });
   }
   if (source) {
-    support.push({
-      label: 'Last spoke',
-      value: `${relativeDays(daysBetween(source.startedAt, FIXTURE_NOW))} · ${source.title}`,
-    });
+    // Just the when. The receipt header directly below names the conversation,
+    // and saying it twice in one fold reads as padding.
+    support.push({ label: 'Last spoke', value: relativeDays(daysBetween(source.startedAt, FIXTURE_NOW)) });
   }
 
   const lastSpoke = source ? relativeDays(daysBetween(source.startedAt, FIXTURE_NOW)) : undefined;
@@ -211,9 +210,9 @@ function buildCard(brief: Brief): HTMLElement {
       <span class="when" data-when>in 4 min</span>
     </p>
     <h1 class="fact">${brief.fact}</h1>
-    ${support ? `<ul class="support">${support}</ul>` : ''}
-    <div class="receipt" data-receipt>
-      <div class="receipt-inner" data-receipt-inner>
+    <div class="fold" data-fold>
+      <div class="fold-inner" data-fold-inner>
+        ${support ? `<ul class="support">${support}</ul>` : ''}
         <p class="receipt-source">${brief.receiptTitle}</p>
         ${receipt}
       </div>
@@ -247,8 +246,8 @@ function present(brief: Brief): void {
   card.focus({ preventScroll: true });
 
   const whenEl = card.querySelector<HTMLElement>('[data-when]')!;
-  const receiptEl = card.querySelector<HTMLElement>('[data-receipt]')!;
-  const receiptInner = card.querySelector<HTMLElement>('[data-receipt-inner]')!;
+  const foldEl = card.querySelector<HTMLElement>('[data-fold]')!;
+  const foldInner = card.querySelector<HTMLElement>('[data-fold-inner]')!;
   const utteranceEl = card.querySelector<HTMLElement>('[data-utterance]')!;
   const bars = [...card.querySelectorAll<HTMLElement>('[data-wave] i')];
 
@@ -292,9 +291,10 @@ function present(brief: Brief): void {
   function paintWave(level: number): void {
     history = [...history.slice(1), level];
     for (const [i, bar] of bars.entries()) {
-      // Taper the ends so the meter reads as a shape rather than a bar chart.
-      const taper = Math.sin((i / (WAVE_BARS - 1)) * Math.PI) * 0.45 + 0.55;
-      bar.style.transform = `scaleY(${0.08 + history[i]! * taper * 0.92})`;
+      // Taper only the leading edge, so the meter reads as sound arriving
+      // rather than as a symmetric graph sitting there.
+      const taper = 0.72 + 0.28 * Math.min(1, i / 5);
+      bar.style.transform = `scaleY(${0.06 + history[i]! * taper * 0.94})`;
     }
   }
 
@@ -363,7 +363,7 @@ function present(brief: Brief): void {
     if (nextState === unfolded) return;
     unfolded = nextState;
     card.classList.toggle('is-unfolded', unfolded);
-    receiptEl.style.height = unfolded ? `${receiptInner.offsetHeight}px` : '0px';
+    foldEl.style.height = unfolded ? `${foldInner.offsetHeight}px` : '0px';
   }
 
   /* -- endings --------------------------------------------------------- */

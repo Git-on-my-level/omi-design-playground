@@ -13,20 +13,21 @@ Spray-and-pray UI/UX exploration. Many distinct concepts beat one polished app.
 | `prototypes/_voice/` | **Voice detection, no UI.** Mic level + speech boundaries + push-to-talk key binding. You draw the meter. |
 | `reference/hackathon-pack/` | **Read-only capability pack.** Mock SDK, synthetic scenarios, docs, diagnostic harness. |
 | `reference/impeccable/` | **Read-only design skill reference** ([pbakaus/impeccable](https://github.com/pbakaus/impeccable)). Craft/critique guidance—not a Cursor install. |
-| `scripts/serve-prototype.sh` | Serve any prototype by name. |
+| `Makefile` | **How you run things.** `make <name>` serves, `make shot-<name>` screenshots, `make` lists. |
+| `scripts/` | The commands the Makefile wraps. Call them directly only when you need a flag. |
 
 Do **not** put new concepts inside `reference/`. Do **not** edit reference trees unless the user explicitly asks to update them. Do **not** install Impeccable into Cursor or other harnesses from this repo.
 
 ## New prototype checklist
 
-1. `./scripts/new-prototype.sh <kebab-name>` — copies `_template` (mock wiring, `?scenario=`, CSS reset, no taste).
+1. `make new NAME=<kebab-name>` — copies `_template` (mock wiring, `?scenario=`, CSS reset, no taste).
 2. Read `reference/AGENTS.md` **before designing a layout** — it says which fixture data actually
    exists, so you don't build a list for ten people when only four have usable data.
 3. Import the mock from `../../reference/hackathon-pack/src` when you need Omi state.
-4. Run: `./scripts/serve-prototype.sh <kebab-name>` (after `cd reference/hackathon-pack && npm install` once).
-   It typechecks first; `OMI_SKIP_TYPECHECK=1` bypasses.
-5. **Look at it before calling it done:** `./scripts/screenshot-prototype.sh <kebab-name>`, then
-   open the PNG. Non-negotiable — see below.
+4. Run it: `make <kebab-name>`. Dependencies install themselves on first run, and it
+   typechecks before serving; `OMI_SKIP_TYPECHECK=1` bypasses.
+5. **Look at it before calling it done:** `make shot-<kebab-name>`, then open the PNG.
+   Non-negotiable — see below.
 6. Keep it independent: no shared UI kit, no cross-prototype imports, no “design system” that couples ideas.
 
 Start from `_template` only. **Do not copy an existing prototype or the pack's `examples/` as a
@@ -42,7 +43,9 @@ This is a *design* hackathon, and a prototype that typechecks can still be visib
 by curl, unit test, and reasoning is not verification here.
 
 ```bash
-./scripts/screenshot-prototype.sh threshold                    # → prototypes/threshold/screenshot.png
+make shot-threshold                                            # → prototypes/threshold/screenshot.png
+
+# The script takes flags the Makefile target does not:
 ./scripts/screenshot-prototype.sh threshold --wait 4000        # let animations advance further
 ./scripts/screenshot-prototype.sh threshold --scenario first-run
 ./scripts/screenshot-prototype.sh threshold --size 1512x982 -o /tmp/shot.png
@@ -163,4 +166,4 @@ Impeccable is a **taste reference**, not a shared component library. Each protot
 - Every pixel on screen must be something the real product would ship. If a surface looks empty,
   fill it with credible product content or shrink the surface; do not explain the emptiness.
 - macOS, iOS, or a credible responsive stand-in are all fine.
-- Verify the pack only when needed: `cd reference/hackathon-pack && npm test`.
+- Verify the pack only when needed: `make test`.

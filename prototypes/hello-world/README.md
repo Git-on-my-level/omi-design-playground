@@ -8,7 +8,7 @@ type, layout — and starting here produces a variant of it rather than a new be
 Start from the scaffold instead:
 
 ```bash
-./scripts/new-prototype.sh <kebab-name>
+make new NAME=<kebab-name>
 ```
 
 Kept only as a minimal check that the serve pipeline works.

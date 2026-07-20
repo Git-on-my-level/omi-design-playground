@@ -41,9 +41,9 @@ body {
 
 .stage {
   position: fixed;
-  top: 58px;
-  right: 32px;
-  width: 380px;
+  top: 46px;
+  right: 22px;
+  width: 306px;
 }
 
 /* ---- the card ---------------------------------------------------------- */
@@ -55,9 +55,9 @@ body {
  */
 .card {
   position: relative;
-  width: 380px;
-  padding: 32px 32px 26px;
-  border-radius: 24px;
+  width: 306px;
+  padding: 18px 20px 14px;
+  border-radius: 18px;
   background: linear-gradient(168deg, rgba(58, 44, 34, 0.3), rgba(22, 18, 15, 0.42));
   border: 1px solid rgba(245, 239, 230, 0.14);
   backdrop-filter: blur(26px) saturate(135%) brightness(0.6);
@@ -134,11 +134,11 @@ body {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 16px;
-  margin: 0 0 22px;
-  font-size: 12px;
+  gap: 14px;
+  margin: 0 0 12px;
+  font-size: 10px;
   line-height: 1;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-dim);
 }
@@ -163,10 +163,10 @@ body {
 .fact {
   margin: 0;
   font-family: 'Instrument Serif', Georgia, serif;
-  font-size: 48px;
+  font-size: 25px;
   font-weight: 400;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
+  line-height: 1.16;
+  letter-spacing: -0.008em;
   color: var(--ink);
   text-wrap: balance;
   /* The backdrop is live now; the fact must hold over a bright patch of it. */
@@ -176,22 +176,20 @@ body {
 /* ---- supporting lines: same size as eyebrow, never a third scale ------- */
 
 .support {
-  margin: 26px 0 0;
+  margin: 0 0 16px;
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 12px;
-  border-top: 1px solid var(--edge);
-  padding-top: 20px;
+  gap: 10px;
 }
 
 /* Label above value: the labels never wrap, and the value gets the full
    measure of the card. */
 .support li {
   display: grid;
-  gap: 5px;
-  font-size: 12px;
-  line-height: 1.45;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1.42;
   color: var(--ink-dim);
 }
 
@@ -207,7 +205,9 @@ body {
 
 /* ---- receipt (drag down to unfold) ------------------------------------- */
 
-.receipt {
+/* Everything except the one fact lives in here. The default card is the fact;
+   the why and the receipt are one drag away. */
+.fold {
   overflow: hidden;
   height: 0;
   opacity: 0;
@@ -216,30 +216,30 @@ body {
     opacity 200ms ease-out;
 }
 
-.card.is-unfolded .receipt {
+.card.is-unfolded .fold {
   opacity: 1;
 }
 
-.receipt-inner {
-  margin-top: 20px;
-  padding-top: 20px;
+.fold-inner {
+  margin-top: 16px;
+  padding-top: 16px;
   border-top: 1px solid var(--edge);
 }
 
 .receipt-source {
-  margin: 0 0 14px;
-  font-size: 12px;
+  margin: 0 0 10px;
+  font-size: 10px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: rgba(138, 128, 121, 0.62);
 }
 
 .receipt-line {
-  margin: 0 0 10px;
-  padding-left: 14px;
+  margin: 0 0 8px;
+  padding-left: 11px;
   border-left: 1px solid rgba(232, 116, 59, 0.28);
-  font-size: 12px;
-  line-height: 1.55;
+  font-size: 11px;
+  line-height: 1.5;
   color: rgba(245, 239, 230, 0.7);
 }
 
@@ -284,7 +284,7 @@ body {
 .grip {
   position: absolute;
   left: 50%;
-  top: 10px;
+  top: 7px;
   width: 28px;
   height: 2px;
   margin-left: -14px;
@@ -308,9 +308,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-top: 26px;
-  padding-top: 18px;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid var(--edge);
 }
 
@@ -326,8 +326,8 @@ body {
 
 /* A microphone, drawn small: capsule, yoke, stand. */
 .mic {
-  width: 11px;
-  height: 15px;
+  width: 10px;
+  height: 13px;
   flex: none;
   background: rgba(245, 239, 230, 0.55);
   transition: background 200ms ease-out, filter 200ms ease-out;
@@ -341,9 +341,9 @@ body {
 
 .keycap {
   font-family: inherit;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1;
-  padding: 4px 7px 5px;
+  padding: 3px 6px 4px;
   border-radius: 5px;
   color: rgba(245, 239, 230, 0.72);
   background: rgba(245, 239, 230, 0.11);
@@ -377,7 +377,7 @@ body {
 }
 
 .card.is-listening .wave {
-  width: 148px;
+  width: 124px;
   opacity: 0.85;
 }
 
@@ -418,7 +418,7 @@ body {
   margin: 0;
   max-height: 0;
   opacity: 0;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.4;
   color: rgba(245, 239, 230, 0.9);
   transition:
@@ -428,8 +428,8 @@ body {
 }
 
 .utterance:not(:empty) {
-  margin-top: 22px;
-  max-height: 72px;
+  margin-top: 14px;
+  max-height: 68px;
   opacity: 1;
 }
 
@@ -438,11 +438,11 @@ body {
 .cta {
   flex: none;
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.01em;
   color: rgba(245, 239, 230, 0.82);
-  padding: 8px 14px;
+  padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid rgba(245, 239, 230, 0.16);
   background: rgba(245, 239, 230, 0.06);
