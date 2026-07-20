@@ -36,6 +36,10 @@ Threshold must never become browsable, but it cannot be a dead end either — th
 
 This is what keeps the concept honest. Threshold stays one card and one moment precisely *because* it has somewhere to hand off to.
 
+The app behind the door has three views — Chat, Tasks, and a contact page — and the thing worth stealing from it is that **every cross-reference is navigable in both directions**. A task belongs to a goal and may name a person; the person shows their tasks and the goals they sit under; the goal lists its tasks. Goals are derived from the conversations their commitments came out of, which is the only structure the fixture can honestly support.
+
+That density is exactly what the card must never become. The card is one fact; the app is the whole graph. Keeping them in one prototype is deliberate — it is the argument that an interruption earns its place by being *narrower* than the thing it can open, not by being a smaller copy of it.
+
 ## Design language
 
 **Mood:** the green room. Dim, warm, moments before you go on. Focused and slightly adrenal. Not a dashboard, not a notification — a *cue card handed to you in the wings*.

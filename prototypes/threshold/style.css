@@ -488,8 +488,9 @@ body {
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
-  width: 620px;
-  max-height: calc(100vh - 180px);
+  width: 880px;
+  height: 620px;
+  max-height: calc(100vh - 150px);
   border-radius: 14px;
   overflow: hidden;
   color: var(--ink);
@@ -576,13 +577,109 @@ body {
   color: rgba(245, 239, 230, 0.72);
 }
 
-/* ---- body -------------------------------------------------------------- */
+/* ---- body: sidebar + view ---------------------------------------------- */
 
-.win-body {
+.win-main {
   display: flex;
-  flex-direction: column;
   min-height: 0;
   flex: 1;
+}
+
+.side {
+  width: 210px;
+  flex: none;
+  padding: 12px 10px;
+  overflow-y: auto;
+  border-right: 1px solid rgba(245, 239, 230, 0.07);
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.side-item,
+.side-person {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  color: rgba(245, 239, 230, 0.72);
+  padding: 7px 9px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  cursor: pointer;
+  transition: background 140ms ease-out, color 140ms ease-out;
+}
+
+.side-item:hover,
+.side-person:hover {
+  background: rgba(245, 239, 230, 0.06);
+  color: var(--ink);
+}
+
+.side-item.is-on,
+.side-person.is-on {
+  background: rgba(232, 116, 59, 0.18);
+  color: #fff;
+}
+
+.side-label {
+  margin: 16px 0 4px;
+  padding: 0 9px;
+  font-size: 9px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: rgba(138, 128, 121, 0.75);
+}
+
+.side-face {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 50%;
+  font-size: 8.5px;
+  font-weight: 600;
+  color: #1a1512;
+  background: linear-gradient(150deg, #f0a37a, #e8743b);
+}
+
+.side-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-badge {
+  flex: none;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: rgba(245, 239, 230, 0.8);
+  background: rgba(245, 239, 230, 0.1);
+}
+
+.win-view {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 239, 230, 0.16) transparent;
+}
+
+.view {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.view-chat {
+  height: 100%;
 }
 
 /* ---- context cards ----------------------------------------------------- */
@@ -920,4 +1017,437 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ---- shared view chrome ------------------------------------------------ */
+
+.view-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px 14px;
+}
+
+.view-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.view-sub {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.seg {
+  display: flex;
+  flex: none;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.seg-item {
+  font: inherit;
+  font-size: 11.5px;
+  color: rgba(245, 239, 230, 0.6);
+  padding: 4px 12px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+.seg-item.is-on {
+  color: #fff;
+  background: rgba(245, 239, 230, 0.12);
+}
+
+/* ---- goals ------------------------------------------------------------- */
+
+.goals {
+  padding: 0 22px 22px;
+  display: grid;
+  gap: 22px;
+}
+
+.goal-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.goal-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.goal-intent {
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+.goal-count {
+  flex: none;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(232, 116, 59, 0.9);
+}
+
+.goal-bar {
+  height: 2px;
+  margin: 10px 0 0;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(245, 239, 230, 0.09);
+}
+
+.goal-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(232, 116, 59, 0.7);
+}
+
+.goal-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.goal-tasks {
+  margin-top: 4px;
+}
+
+/* ---- task rows --------------------------------------------------------- */
+
+.task {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  margin: 0 -10px;
+  border-radius: 9px;
+  transition: background 140ms ease-out;
+}
+
+.task:hover {
+  background: rgba(245, 239, 230, 0.045);
+}
+
+.task-check {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(245, 239, 230, 0.32);
+  background: none;
+  cursor: pointer;
+  transition: background 150ms ease-out, border-color 150ms ease-out;
+}
+
+.task-check:hover {
+  border-color: var(--ember);
+}
+
+.task.is-done .task-check {
+  background: var(--ember);
+  border-color: var(--ember);
+}
+
+.task-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-title {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: rgba(245, 239, 230, 0.92);
+}
+
+.task.is-done .task-title {
+  text-decoration: line-through;
+  color: var(--ink-dim);
+}
+
+.task-meta {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.task.is-overdue .task-meta {
+  color: rgba(232, 116, 59, 0.85);
+}
+
+.task-tail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+/* ---- chips that cross-link --------------------------------------------- */
+
+.pchip,
+.gchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 11px;
+  color: rgba(245, 239, 230, 0.72);
+  padding: 3px 9px 3px 3px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 239, 230, 0.11);
+  background: rgba(245, 239, 230, 0.05);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 140ms ease-out, border-color 140ms ease-out, color 140ms ease-out;
+}
+
+.gchip {
+  padding: 3px 10px;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+}
+
+.pchip:hover,
+.gchip:hover {
+  color: #fff;
+  border-color: rgba(232, 116, 59, 0.5);
+  background: rgba(232, 116, 59, 0.16);
+}
+
+.pchip-face {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 50%;
+  font-size: 8px;
+  font-weight: 600;
+  color: #1a1512;
+  background: linear-gradient(150deg, #f0a37a, #e8743b);
+}
+
+/* ---- contact page ------------------------------------------------------ */
+
+.contact-head {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 22px;
+  border-bottom: 1px solid var(--edge);
+}
+
+.contact-face {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  flex: none;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1512;
+  background: linear-gradient(150deg, #f0a37a, #e8743b);
+}
+
+.contact-id {
+  flex: 1;
+  min-width: 0;
+}
+
+.contact-name {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.contact-rel {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: rgba(245, 239, 230, 0.62);
+}
+
+.contact-stats {
+  margin: 5px 0 0;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.contact-ask {
+  flex: none;
+  font: inherit;
+  font-size: 11.5px;
+  color: rgba(245, 239, 230, 0.85);
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 239, 230, 0.16);
+  background: rgba(245, 239, 230, 0.06);
+  cursor: pointer;
+  transition: background 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out;
+}
+
+.contact-ask:hover {
+  color: #fff;
+  border-color: rgba(232, 116, 59, 0.55);
+  background: rgba(232, 116, 59, 0.18);
+}
+
+.contact-body {
+  padding: 6px 22px 24px;
+}
+
+.csec {
+  margin-top: 22px;
+}
+
+.csec-title {
+  margin: 0 0 2px;
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: rgba(138, 128, 121, 0.85);
+}
+
+.csec-note {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  color: var(--ink-dim);
+}
+
+.csec-title + .task,
+.csec-title + .gcard {
+  margin-top: 8px;
+}
+
+/* ---- goal cards on a contact ------------------------------------------- */
+
+.gcard {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  padding: 11px 13px;
+  margin-bottom: 7px;
+  border-radius: 10px;
+  border: 1px solid rgba(245, 239, 230, 0.09);
+  background: rgba(245, 239, 230, 0.04);
+  color: inherit;
+  cursor: pointer;
+  transition: background 150ms ease-out, border-color 150ms ease-out;
+}
+
+.gcard:hover {
+  border-color: rgba(232, 116, 59, 0.4);
+  background: rgba(232, 116, 59, 0.1);
+}
+
+.gcard-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.gcard-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.gcard-bar {
+  display: block;
+  height: 2px;
+  margin-top: 9px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(245, 239, 230, 0.09);
+}
+
+.gcard-bar i {
+  display: block;
+  height: 100%;
+  background: rgba(232, 116, 59, 0.7);
+}
+
+/* ---- memories ---------------------------------------------------------- */
+
+.mgroup {
+  margin-top: 12px;
+}
+
+.mgroup-label {
+  margin: 0 0 5px;
+  font-size: 11px;
+  color: rgba(232, 116, 59, 0.8);
+}
+
+.mline {
+  margin: 0 0 5px;
+  padding-left: 11px;
+  border-left: 1px solid rgba(245, 239, 230, 0.12);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: rgba(245, 239, 230, 0.82);
+}
+
+/* ---- conversations ----------------------------------------------------- */
+
+.conv {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--edge);
+}
+
+.conv:last-child {
+  border-bottom: none;
+}
+
+.conv-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.conv-meta {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.conv-sum {
+  margin: 5px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(245, 239, 230, 0.68);
+}
+
+/* ---- context cards become links ---------------------------------------- */
+
+.ctx.is-linked {
+  cursor: pointer;
+  transition: background 150ms ease-out, border-color 150ms ease-out;
+}
+
+.ctx.is-linked:hover {
+  border-color: rgba(232, 116, 59, 0.4);
+  background: rgba(232, 116, 59, 0.09);
 }

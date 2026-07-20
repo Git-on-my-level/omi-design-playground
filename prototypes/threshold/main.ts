@@ -12,14 +12,13 @@ import { OmiMock, omiScenarioNames, type OmiScenarioName } from '../../reference
 import type { Conversation, Memory, OmiSnapshot, Person, SuggestedAction } from '../../reference/hackathon-pack/src/types';
 import { mountMacStage } from '../_macos-stage';
 import { createVoiceInput, pushToTalk } from '../_voice';
-import { openOmiChat, type ChatContext, type OmiChat } from './chat';
+import { openOmiApp, type OmiChat } from './chat';
+import { buildWorkspace, FIXTURE_NOW, firstName, relativeDays, type Workspace } from './workspace';
 import './style.css';
 
 /* ---------------------------------------------------------------------- *
  * Fixture clock. The scenario is a fixed synthetic day, so "now" is fixed.
  * ---------------------------------------------------------------------- */
-
-const FIXTURE_NOW = new Date('2026-07-20T18:16:00.000Z');
 
 /** Fixture seconds elapsed per real second. Four fixture minutes ≈ 20s of demo. */
 const TIME_COMPRESSION = 12;
@@ -74,20 +73,6 @@ interface Brief {
   support: SupportLine[];
   receiptTitle: string;
   receipt: Array<{ speaker: string; text: string }>;
-  /** Everything the handoff window needs, resolved once here. */
-  chat: ChatContext;
-}
-
-const firstName = (person: Person): string => person.name.split(' ')[0]!;
-
-function daysBetween(from: string, to: Date): number {
-  return Math.max(0, Math.round((to.getTime() - new Date(from).getTime()) / 86_400_000));
-}
-
-function relativeDays(days: number): string {
-  if (days === 0) return 'today';
-  if (days === 1) return 'yesterday';
-  return `${days} days ago`;
 }
 
 /** The commitment this card exists to surface. */
@@ -124,13 +109,15 @@ function buildBrief(person: Person, snapshot: OmiSnapshot): Brief | undefined {
   if (context) {
     support.push({ label: 'Cares about', value: context.text });
   }
-  if (source) {
-    // Just the when. The receipt header directly below names the conversation,
-    // and saying it twice in one fold reads as padding.
-    support.push({ label: 'Last spoke', value: relativeDays(daysBetween(source.startedAt, FIXTURE_NOW)) });
+  // The most recent conversation with them, which is not necessarily the one
+  // the commitment came from. The contact page means the same thing by it.
+  const latest = snapshot.conversations
+    .filter((conversation) => conversation.people.includes(person.id))
+    .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
+  if (latest) {
+    support.push({ label: 'Last spoke', value: relativeDays(latest.startedAt) });
   }
 
-  const lastSpoke = source ? relativeDays(daysBetween(source.startedAt, FIXTURE_NOW)) : undefined;
 
   return {
     person,
@@ -142,26 +129,7 @@ function buildBrief(person: Person, snapshot: OmiSnapshot): Brief | undefined {
       speaker: segment.speaker,
       text: segment.text,
     })),
-    chat: {
-      person,
-      action: commitment,
-      source,
-      memories: snapshot.memories
-        .filter((memory) => memory.people.includes(person.id))
-        .sort((a, b) => (b.relevance ?? 0) - (a.relevance ?? 0)),
-      lastSpoke,
-      dueLabel: commitment.dueAt ? dueLabel(commitment.dueAt) : undefined,
-    },
   };
-}
-
-/** Actions carry exactly one `dueAt`, so this is the only time language there is. */
-function dueLabel(dueAt: string): string {
-  const days = Math.round((new Date(dueAt).getTime() - FIXTURE_NOW.getTime()) / 86_400_000);
-  if (days < 0) return 'Overdue';
-  if (days === 0) return 'Due today';
-  if (days === 1) return 'Due tomorrow';
-  return `Due in ${days} days`;
 }
 
 /** Fabricated calendar: whoever you owe something to, in the order you owe it. */
@@ -237,6 +205,8 @@ function buildCard(brief: Brief): HTMLElement {
  * ---------------------------------------------------------------------- */
 
 let sequence: Brief[] = [];
+/** Goals, people, and tasks, resolved once. The app window reads from this. */
+let workspace: Workspace;
 let index = 0;
 let ticker: number | undefined;
 
@@ -345,11 +315,16 @@ function present(brief: Brief): void {
     if (done || chat) return;
     paused = true;
     card.classList.add('is-handing-off');
-    chat = openOmiChat(stage.surface, brief.chat, () => {
-      chat = undefined;
-      // The moment is over either way. Threshold does not resume a card.
-      advance(0);
-    }, asking);
+    chat = openOmiApp(stage.surface, {
+      workspace,
+      focusPersonId: brief.person.id,
+      asking,
+      onClose: () => {
+        chat = undefined;
+        // The moment is over either way. Threshold does not resume a card.
+        advance(0);
+      },
+    });
   }
 
   card.querySelector<HTMLButtonElement>('[data-open]')!.addEventListener('click', (event) => {
@@ -494,6 +469,7 @@ function next(): void {
 
 async function start(): Promise<void> {
   const snapshot = await omi.getSnapshot();
+  workspace = buildWorkspace(snapshot);
   sequence = upcoming(snapshot);
 
   if (sequence.length === 0) return;

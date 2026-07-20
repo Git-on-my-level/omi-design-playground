@@ -1,43 +1,36 @@
 /**
- * The window Threshold hands off to.
+ * The app Threshold hands off to.
  *
  * Threshold itself never becomes browsable — the moment you want to *do*
  * something with a brief, the card retires and this window takes over. It opens
- * already knowing what you were looking at, which is the whole point: the
- * context cards at the top are the card you just dismissed, restated as objects
- * you can act on.
+ * already knowing who you were looking at.
  *
- * Context cards are typed. A person resolves to a contact card, a commitment to
- * a task card. Adding a third kind means adding a branch here, not a new layout.
+ * Three views, one sidebar. Chat is where you arrive, because a question is
+ * what you had; Tasks and the contact pages are where that question resolves
+ * into something with edges. Every cross-reference is navigable in both
+ * directions: a task names a person, a person shows their tasks, a task belongs
+ * to a goal, a goal lists its people.
  */
-import type { Conversation, Memory, Person, SuggestedAction } from '../../reference/hackathon-pack/src/types';
+import type { Conversation, Memory } from '../../reference/hackathon-pack/src/types';
 import { createVoiceInput, pushToTalk } from '../_voice';
+import { renderContact, renderTasks, type Nav } from './views';
+import { firstName, initials, type PersonView, type TaskView, type Workspace } from './workspace';
 
-export interface ChatContext {
-  person: Person;
-  action: SuggestedAction;
-  source?: Conversation;
-  /** Every memory that names this person, most relevant first. */
-  memories: Memory[];
-  /** Rendered relative day for the last exchange, e.g. "6 days ago". */
-  lastSpoke?: string;
-  dueLabel?: string;
+export interface OmiAppOptions {
+  workspace: Workspace;
+  /** Who the card was about. The app opens on them. */
+  focusPersonId: string;
+  /** A question spoken at the card, carried straight into the thread. */
+  asking?: string;
+  onClose(): void;
 }
 
 export interface OmiChat {
   close(): void;
 }
 
-type CardKind = 'person' | 'task';
-
 /** Matches the meter on the card, so the same voice reads as the same object. */
 const WAVE_BARS = 26;
-
-interface Prompt {
-  label: string;
-  question: string;
-  answer(context: ChatContext): { text: string; quote?: string; cite?: string };
-}
 
 /* ---------------------------------------------------------------------- *
  * Replies
@@ -47,168 +40,160 @@ interface Prompt {
  * fixture data, so the window reads like an assistant that has the context.
  * ---------------------------------------------------------------------- */
 
-const firstName = (person: Person): string => person.name.split(' ')[0]!;
+interface Answer {
+  text: string;
+  quote?: string;
+  cite?: string;
+}
+
+interface Prompt {
+  label: string;
+  question(view: PersonView): string;
+  answer(view: PersonView, workspace: Workspace): Answer;
+}
+
+/** The commitment the card was about: their first open task. */
+function primaryTask(view: PersonView): TaskView | undefined {
+  return view.tasks.find((task) => task.action.status === 'open') ?? view.tasks[0];
+}
 
 /** The transcript line the commitment came from, preferring one that names it. */
-function receiptLine(context: ChatContext): { speaker: string; text: string } | undefined {
-  const segments = context.source?.segments ?? [];
-  const keyword = context.action.title.split(' ').find((word) => word.length > 5)?.toLowerCase();
+function receiptLine(source: Conversation | undefined, title: string): { speaker: string; text: string } | undefined {
+  const segments = source?.segments ?? [];
+  const keyword = title.split(' ').find((word) => word.length > 5)?.toLowerCase();
   const matched = keyword
     ? segments.find((segment) => segment.text.toLowerCase().includes(keyword))
     : undefined;
   return matched ?? segments[0];
 }
 
-function byKind(context: ChatContext, kind: Memory['kind']): Memory | undefined {
-  return context.memories.find((memory) => memory.kind === kind);
+function byKind(view: PersonView, kind: Memory['kind']): Memory | undefined {
+  return view.memories.find((memory) => memory.kind === kind);
 }
 
 const PROMPTS: Prompt[] = [
   {
     label: 'What did I promise?',
-    question: `What exactly did I promise ${'{first}'}?`,
-    answer: (context) => {
-      const line = receiptLine(context);
+    question: (view) => `What exactly did I promise ${firstName(view.person)}?`,
+    answer: (view) => {
+      const task = primaryTask(view);
+      if (!task) {
+        return { text: `Nothing is outstanding with ${firstName(view.person)} right now.` };
+      }
+      const line = receiptLine(task.source, task.action.title);
       return {
-        text: `You committed to this: “${context.action.title}”. It came out of one exchange, not a thread — here is the line it came from.`,
+        text: `You committed to this: “${task.action.title}”. It came out of one exchange, not a thread — here is the line it came from.`,
         quote: line ? `${line.speaker}: ${line.text}` : undefined,
-        cite: context.source?.title,
+        cite: task.source?.title,
       };
     },
   },
   {
-    label: 'What matters to her?',
-    question: 'What should I keep in mind about her?',
-    answer: (context) => {
-      const relationship = byKind(context, 'relationship');
-      const preference = byKind(context, 'preference');
-      const lines = [relationship?.text, preference?.text].filter(Boolean) as string[];
+    label: 'What should I keep in mind?',
+    question: () => 'What should I keep in mind about them?',
+    answer: (view) => {
+      const lines = [byKind(view, 'relationship')?.text, byKind(view, 'preference')?.text].filter(
+        Boolean,
+      ) as string[];
       return {
         text: lines.length
           ? lines.map((line) => `· ${line}`).join('\n')
-          : `Nothing beyond the commitment itself has come up with ${firstName(context.person)} yet.`,
-        cite: `${context.memories.length} memories`,
+          : `Nothing beyond the commitment itself has come up with ${firstName(view.person)} yet.`,
+        cite: `${view.memories.length} memories`,
+      };
+    },
+  },
+  {
+    label: 'How does this fit?',
+    question: () => 'How does this fit into what I am working on?',
+    answer: (view) => {
+      const goal = view.goals[0];
+      if (!goal) {
+        return { text: `${firstName(view.person)} is not attached to any of your current goals.` };
+      }
+      return {
+        text: `It sits under ${goal.title.toLowerCase()} — ${goal.intent} That goal has ${goal.open} open and ${goal.done} done, and ${goal.people.length > 1 ? `${goal.people.length} people are named in it` : `${firstName(view.person)} is the only person named in it`}.`,
+        cite: goal.title,
       };
     },
   },
   {
     label: 'Draft the follow-up',
-    question: 'Draft the follow-up note.',
-    answer: (context) => ({
-      text: `${firstName(context.person)} — following up on what I owed you after ${(context.source?.title ?? 'our last conversation').toLowerCase()}. ${context.action.title} is coming your way${context.dueLabel ? ` ${context.dueLabel.toLowerCase()}` : ''}. Shout if the shape of it is wrong and I will redo it.`,
-      cite: 'Draft · not sent',
-    }),
+    question: () => 'Draft the follow-up note.',
+    answer: (view) => {
+      const task = primaryTask(view);
+      return {
+        text: `${firstName(view.person)} — following up on what I owed you after ${(task?.source?.title ?? 'our last conversation').toLowerCase()}. ${task ? task.action.title : 'The thing I promised'} is coming your way${task?.dueLabel ? ` ${task.dueLabel.toLowerCase()}` : ''}. Shout if the shape of it is wrong and I will redo it.`,
+        cite: 'Draft · not sent',
+      };
+    },
   },
 ];
-
-/* ---------------------------------------------------------------------- *
- * Context cards
- * ---------------------------------------------------------------------- */
-
-function initials(name: string): string {
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('');
-}
-
-function contextCard(kind: CardKind, context: ChatContext): HTMLElement {
-  const card = document.createElement('div');
-  card.className = `ctx ctx-${kind}`;
-
-  if (kind === 'person') {
-    const meta = [context.lastSpoke && `Last spoke ${context.lastSpoke}`, `${context.memories.length} memories`]
-      .filter(Boolean)
-      .join(' · ');
-    card.innerHTML = `
-      <span class="ctx-avatar">${initials(context.person.name)}</span>
-      <div class="ctx-body">
-        <p class="ctx-title">${context.person.name}</p>
-        <p class="ctx-sub">${context.person.relationship}</p>
-        <p class="ctx-meta">${meta}</p>
-      </div>
-      <span class="ctx-kind">Contact</span>
-    `;
-    return card;
-  }
-
-  const meta = [context.dueLabel, context.source && `from ${context.source.title}`].filter(Boolean).join(' · ');
-  card.innerHTML = `
-    <button class="ctx-check" type="button" aria-pressed="false" aria-label="Mark complete"></button>
-    <div class="ctx-body">
-      <p class="ctx-title ctx-task">${context.action.title}</p>
-      <p class="ctx-meta">${meta}</p>
-    </div>
-    <span class="ctx-kind">Task</span>
-  `;
-
-  const check = card.querySelector<HTMLButtonElement>('.ctx-check')!;
-  check.addEventListener('click', () => {
-    const next = card.classList.toggle('is-complete');
-    check.setAttribute('aria-pressed', String(next));
-  });
-
-  return card;
-}
 
 /* ---------------------------------------------------------------------- *
  * The window
  * ---------------------------------------------------------------------- */
 
-export function openOmiChat(
-  host: HTMLElement,
-  context: ChatContext,
-  onClose: () => void,
-  /** A question spoken at the card, carried straight into the thread. */
-  asking?: string,
-): OmiChat {
+export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
+  const { workspace, onClose } = options;
+  let focus = workspace.personById.get(options.focusPersonId) ?? workspace.people[0]!;
+
   const win = document.createElement('section');
   win.className = 'omi-window is-opening';
   win.setAttribute('role', 'dialog');
-  win.setAttribute('aria-label', `omi — ${context.person.name}`);
+  win.setAttribute('aria-label', 'omi');
 
   win.innerHTML = `
     <header class="win-bar" data-drag>
       <span class="lights"><i class="l-close"></i><i class="l-min"></i><i class="l-max"></i></span>
-      <span class="win-title">${context.person.name}</span>
+      <span class="win-title" data-wintitle></span>
     </header>
-    <div class="win-body">
-      <div class="ctx-rail" data-rail></div>
-      <div class="thread" data-thread></div>
+    <div class="win-main">
+      <nav class="side">
+        <button class="side-item" type="button" data-nav="chat">Chat</button>
+        <button class="side-item" type="button" data-nav="tasks">Tasks</button>
+        <p class="side-label">People</p>
+        <div class="side-people" data-people></div>
+      </nav>
+      <div class="win-view" data-view></div>
     </div>
-    <footer class="win-foot">
-      <div class="chips" data-chips></div>
-      <form class="composer" data-composer>
-        <input
-          class="composer-input"
-          type="text"
-          autocomplete="off"
-          placeholder="Ask about ${firstName(context.person)}…"
-          data-input
-        />
-        <span class="composer-wave" data-wave aria-hidden="true">${'<i></i>'.repeat(WAVE_BARS)}</span>
-        <kbd class="composer-key">⌘</kbd>
-        <button class="composer-send" type="submit" aria-label="Send">↵</button>
-      </form>
-    </footer>
   `;
 
-  const rail = win.querySelector<HTMLElement>('[data-rail]')!;
-  const thread = win.querySelector<HTMLElement>('[data-thread]')!;
-  const chips = win.querySelector<HTMLElement>('[data-chips]')!;
-  const form = win.querySelector<HTMLFormElement>('[data-composer]')!;
-  const input = win.querySelector<HTMLInputElement>('[data-input]')!;
+  const titleEl = win.querySelector<HTMLElement>('[data-wintitle]')!;
+  const viewHost = win.querySelector<HTMLElement>('[data-view]')!;
+  const peopleSlot = win.querySelector<HTMLElement>('[data-people]')!;
 
-  rail.append(contextCard('person', context), contextCard('task', context));
+  /* -- sidebar people -------------------------------------------------- */
 
-  /* -- thread ---------------------------------------------------------- */
+  for (const view of workspace.people) {
+    const open = view.tasks.filter((task) => task.action.status === 'open').length;
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'side-person';
+    item.dataset.person = view.person.id;
+    item.innerHTML = `
+      <span class="side-face">${initials(view.person.name)}</span>
+      <span class="side-name">${view.person.name}</span>
+      ${open > 0 ? `<span class="side-badge">${open}</span>` : ''}
+    `;
+    item.addEventListener('click', () => go({ view: 'person', personId: view.person.id }));
+    peopleSlot.append(item);
+  }
+
+  /* -- chat view ------------------------------------------------------- */
+
+  let thread: HTMLElement | undefined;
+  let chips: HTMLElement | undefined;
+  let input: HTMLInputElement | undefined;
+  let bars: HTMLElement[] = [];
+  const asked = new Set<string>();
 
   function scrollToEnd(): void {
-    thread.scrollTop = thread.scrollHeight;
+    if (thread) thread.scrollTop = thread.scrollHeight;
   }
 
   function addUser(text: string): void {
+    if (!thread) return;
     const bubble = document.createElement('p');
     bubble.className = 'msg msg-user';
     bubble.textContent = text;
@@ -216,7 +201,8 @@ export function openOmiChat(
     scrollToEnd();
   }
 
-  function addOmi(body: { text: string; quote?: string; cite?: string }, thinking = true): void {
+  function addOmi(body: Answer, thinking = true): void {
+    if (!thread) return;
     const block = document.createElement('div');
     block.className = 'msg msg-omi';
     if (thinking) block.classList.add('is-thinking');
@@ -242,73 +228,189 @@ export function openOmiChat(
     else settle();
   }
 
-  /*
-   * The opener orients; it does not pre-empt. If a question arrived with you
-   * from the card, the receipt belongs in the answer to that question, not
-   * here — printing it twice makes the assistant look like it is repeating
-   * itself before you have said anything.
-   */
-  const line = receiptLine(context);
-  addOmi(
-    asking
-      ? {
-          text: `One thing is still open with ${firstName(context.person)}${context.lastSpoke ? `, and has been since you spoke ${context.lastSpoke}` : ''}.`,
-        }
-      : {
-          text: `You are about to talk to ${firstName(context.person)}, and there is one thing outstanding${context.dueLabel ? ` — ${context.dueLabel.toLowerCase()}` : ''}.`,
-          quote: line ? `${line.speaker}: ${line.text}` : undefined,
-          cite: context.source?.title,
-        },
-    false,
-  );
-
-  /* -- prompts --------------------------------------------------------- */
+  function paintChips(): void {
+    if (!chips) return;
+    chips.replaceChildren();
+    for (const prompt of PROMPTS) {
+      if (asked.has(prompt.label)) continue;
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip';
+      chip.textContent = prompt.label;
+      chip.addEventListener('click', () => ask(prompt));
+      chips.append(chip);
+    }
+  }
 
   function ask(prompt: Prompt): void {
-    addUser(prompt.question.replace('{first}', firstName(context.person)));
-    addOmi(prompt.answer(context));
+    asked.add(prompt.label);
+    paintChips();
+    addUser(prompt.question(focus));
+    addOmi(prompt.answer(focus, workspace));
   }
 
-  const chipFor = new Map<Prompt, HTMLElement>();
+  function buildChat(): HTMLElement {
+    const view = document.createElement('div');
+    view.className = 'view view-chat';
+    view.innerHTML = `
+      <div class="ctx-rail" data-rail></div>
+      <div class="thread" data-thread></div>
+      <footer class="win-foot">
+        <div class="chips" data-chips></div>
+        <form class="composer" data-composer>
+          <input class="composer-input" type="text" autocomplete="off"
+                 placeholder="Ask about ${firstName(focus.person)}…" data-input />
+          <span class="composer-wave" data-wave aria-hidden="true">${'<i></i>'.repeat(WAVE_BARS)}</span>
+          <kbd class="composer-key">⌘</kbd>
+          <button class="composer-send" type="submit" aria-label="Send">↵</button>
+        </form>
+      </footer>
+    `;
 
-  for (const prompt of PROMPTS) {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'chip';
-    chip.textContent = prompt.label;
-    chip.addEventListener('click', () => {
-      chip.remove();
-      ask(prompt);
+    thread = view.querySelector<HTMLElement>('[data-thread]')!;
+    chips = view.querySelector<HTMLElement>('[data-chips]')!;
+    input = view.querySelector<HTMLInputElement>('[data-input]')!;
+    bars = [...view.querySelectorAll<HTMLElement>('[data-wave] i')];
+
+    const rail = view.querySelector<HTMLElement>('[data-rail]')!;
+    rail.append(contextCard('person', focus));
+    const task = primaryTask(focus);
+    if (task) rail.append(contextCard('task', focus, task));
+
+    const form = view.querySelector<HTMLFormElement>('[data-composer]')!;
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const text = input!.value.trim();
+      if (!text) return;
+      input!.value = '';
+      addUser(text);
+      const match =
+        PROMPTS.find((prompt) =>
+          prompt.label
+            .toLowerCase()
+            .split(' ')
+            .some((word) => word.length > 3 && text.toLowerCase().includes(word)),
+        ) ?? PROMPTS[0]!;
+      asked.add(match.label);
+      paintChips();
+      addOmi(match.answer(focus, workspace));
     });
-    chips.append(chip);
-    chipFor.set(prompt, chip);
+
+    paintChips();
+    return view;
   }
 
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const text = input.value.trim();
-    if (!text) return;
-    input.value = '';
-    addUser(text);
-    // Free text lands on the closest canned prompt; the fixture has no LLM.
-    const match =
-      PROMPTS.find((prompt) =>
-        prompt.label
-          .toLowerCase()
-          .split(' ')
-          .some((word) => word.length > 3 && text.toLowerCase().includes(word)),
-      ) ?? PROMPTS[0]!;
-    addOmi(match.answer(context));
-  });
+  /* -- context cards --------------------------------------------------- */
+
+  function contextCard(kind: 'person' | 'task', view: PersonView, task?: TaskView): HTMLElement {
+    const card = document.createElement('div');
+    card.className = `ctx ctx-${kind}`;
+
+    if (kind === 'person') {
+      const meta = [view.lastSpoke && `Last spoke ${view.lastSpoke}`, `${view.memories.length} memories`]
+        .filter(Boolean)
+        .join(' · ');
+      card.innerHTML = `
+        <span class="ctx-avatar">${initials(view.person.name)}</span>
+        <div class="ctx-body">
+          <p class="ctx-title">${view.person.name}</p>
+          <p class="ctx-sub">${view.person.relationship}</p>
+          <p class="ctx-meta">${meta}</p>
+        </div>
+        <span class="ctx-kind">Contact</span>
+      `;
+      card.classList.add('is-linked');
+      card.addEventListener('click', () => go({ view: 'person', personId: view.person.id }));
+      return card;
+    }
+
+    const meta = [task!.dueLabel, task!.source && `from ${task!.source.title}`].filter(Boolean).join(' · ');
+    card.innerHTML = `
+      <button class="ctx-check" type="button" aria-pressed="false" aria-label="Mark complete"></button>
+      <div class="ctx-body">
+        <p class="ctx-title ctx-task">${task!.action.title}</p>
+        <p class="ctx-meta">${meta}</p>
+      </div>
+      <span class="ctx-kind">Task</span>
+    `;
+
+    const check = card.querySelector<HTMLButtonElement>('.ctx-check')!;
+    check.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const next = card.classList.toggle('is-complete');
+      check.setAttribute('aria-pressed', String(next));
+    });
+    card.classList.add('is-linked');
+    card.addEventListener('click', () => go({ view: 'tasks', goalId: task!.goal.id }));
+
+    return card;
+  }
+
+  /* -- navigation ------------------------------------------------------ */
+
+  type Route =
+    | { view: 'chat' }
+    | { view: 'tasks'; goalId?: string }
+    | { view: 'person'; personId: string };
+
+  let route: Route = { view: 'chat' };
+
+  const nav: Nav = {
+    person: (id) => go({ view: 'person', personId: id }),
+    tasks: (goalId) => go({ view: 'tasks', goalId }),
+    ask: (question) => {
+      go({ view: 'chat' });
+      addUser(question);
+      addOmi(PROMPTS[1]!.answer(focus, workspace));
+    },
+  };
+
+  function go(next: Route): void {
+    route = next;
+    if (next.view === 'person') {
+      const view = workspace.personById.get(next.personId);
+      if (view) focus = view;
+    }
+
+    for (const item of win.querySelectorAll<HTMLElement>('.side-item')) {
+      item.classList.toggle('is-on', item.dataset.nav === next.view);
+    }
+    for (const item of win.querySelectorAll<HTMLElement>('.side-person')) {
+      item.classList.toggle('is-on', next.view === 'person' && item.dataset.person === next.personId);
+    }
+
+    if (next.view === 'chat') {
+      titleEl.textContent = focus.person.name;
+      viewHost.replaceChildren(buildChat());
+      scrollToEnd();
+    } else if (next.view === 'tasks') {
+      titleEl.textContent = 'Tasks';
+      thread = chips = input = undefined;
+      bars = [];
+      viewHost.replaceChildren(renderTasks(workspace, nav, next.goalId));
+    } else {
+      titleEl.textContent = focus.person.name;
+      thread = chips = input = undefined;
+      bars = [];
+      viewHost.replaceChildren(renderContact(focus, workspace, nav));
+    }
+    viewHost.scrollTop = 0;
+  }
+
+  for (const item of win.querySelectorAll<HTMLElement>('[data-nav]')) {
+    item.addEventListener('click', () => {
+      go(item.dataset.nav === 'tasks' ? { view: 'tasks' } : { view: 'chat' });
+    });
+  }
 
   /* -- push to talk ---------------------------------------------------- *
    *
    * The same hold that filled the card fills the composer here. Holding right
-   * ⌘ turns the input into a meter and types into it; releasing sends.
+   * ⌘ from any view jumps to chat and starts listening — the question you have
+   * out loud is always a chat question, whatever you happen to be looking at.
    * -------------------------------------------------------------------- */
 
-  const bars = [...win.querySelectorAll<HTMLElement>('[data-wave] i')];
-  const DICTATION = 'Draft the follow-up and remind me what she cares about';
+  const DICTATION = 'Draft the follow-up and remind me what they care about';
   const dictated = DICTATION.split(' ');
   let spoken = 0;
   let history = new Array<number>(WAVE_BARS).fill(0);
@@ -329,12 +431,13 @@ export function openOmiChat(
   const unbindPtt = pushToTalk({
     onPress: () => {
       if (closed) return;
+      if (route.view !== 'chat') go({ view: 'chat' });
       spoken = 0;
-      input.value = '';
+      if (input) input.value = '';
       win.classList.add('is-listening');
       void voice.start();
       reveal = window.setInterval(() => {
-        if (spoken >= dictated.length) return;
+        if (spoken >= dictated.length || !input) return;
         spoken += 1;
         input.value = dictated.slice(0, spoken).join(' ');
       }, 170);
@@ -344,12 +447,13 @@ export function openOmiChat(
       reveal = undefined;
       voice.stop();
       win.classList.remove('is-listening', 'is-hearing');
-      if (spoken < 2) {
-        input.value = '';
+      if (spoken < 2 || !input) {
+        if (input) input.value = '';
         return;
       }
       input.value = DICTATION;
-      window.setTimeout(() => form.requestSubmit(), 300);
+      const form = win.querySelector<HTMLFormElement>('[data-composer]');
+      window.setTimeout(() => form?.requestSubmit(), 300);
     },
   });
 
@@ -408,15 +512,38 @@ export function openOmiChat(
 
   host.append(win);
   win.addEventListener('animationend', () => win.classList.remove('is-opening'), { once: true });
-  window.setTimeout(() => input.focus({ preventScroll: true }), 260);
 
-  // Carried in from the card: the question was already asked out loud.
-  if (asking) {
+  go({ view: 'chat' });
+  /*
+   * The opener orients; it does not pre-empt. If a question arrived with you
+   * from the card, the receipt belongs in the answer to that question, not
+   * here — printing it twice makes the assistant look like it is repeating
+   * itself before you have said anything.
+   */
+  const task = primaryTask(focus);
+  const line = task ? receiptLine(task.source, task.action.title) : undefined;
+  addOmi(
+    options.asking
+      ? {
+          text: `One thing is still open with ${firstName(focus.person)}${focus.lastSpoke ? `, and has been since you spoke ${focus.lastSpoke}` : ''}.`,
+        }
+      : {
+          text: `You are about to talk to ${firstName(focus.person)}, and there is one thing outstanding${task?.dueLabel ? ` — ${task.dueLabel.toLowerCase()}` : ''}.`,
+          quote: line ? `${line.speaker}: ${line.text}` : undefined,
+          cite: task?.source?.title,
+        },
+    false,
+  );
+
+  window.setTimeout(() => input?.focus({ preventScroll: true }), 260);
+
+  if (options.asking) {
     // It was already asked out loud, so it is no longer on offer.
-    chipFor.get(PROMPTS[0]!)?.remove();
+    asked.add(PROMPTS[0]!.label);
+    paintChips();
     window.setTimeout(() => {
-      addUser(asking);
-      addOmi(PROMPTS[0]!.answer(context));
+      addUser(options.asking!);
+      addOmi(PROMPTS[0]!.answer(focus, workspace));
     }, 420);
   }
 
