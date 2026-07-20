@@ -1,7 +1,9 @@
-import { OmiMock } from '../../src';
+import { OmiMock, omiScenarioNames } from '../../src';
 import './style.css';
 
-const omi = new OmiMock();
+const requestedScenario = new URLSearchParams(window.location.search).get('scenario');
+const scenario = omiScenarioNames.find((name) => name === requestedScenario) ?? 'default';
+const omi = new OmiMock({ scenario });
 let platform: 'macos' | 'ios' = 'macos';
 
 const query = <T extends Element>(selector: string) => {
@@ -11,6 +13,7 @@ const query = <T extends Element>(selector: string) => {
 };
 
 const title = query<HTMLElement>('#title');
+const scenarioState = query<HTMLElement>('#scenario-state');
 const deviceState = query<HTMLElement>('#device-state');
 const conversationTitle = query<HTMLElement>('#conversation-title');
 const conversationSummary = query<HTMLElement>('#conversation-summary');
@@ -31,6 +34,7 @@ async function render(): Promise<void> {
   const conversation = conversations[0];
   const memory = memories[0];
   title.textContent = platform === 'macos' ? 'A starting desktop data surface' : 'A starting mobile data surface';
+  scenarioState.textContent = `Synthetic scenario: ${scenario}`;
   deviceState.textContent = `${snapshot.device.connection} · ${snapshot.device.batteryPercent}%`;
   conversationTitle.textContent = conversation?.title ?? 'No conversation yet';
   conversationSummary.textContent = conversation?.summary ?? 'Start a capture to create one.';

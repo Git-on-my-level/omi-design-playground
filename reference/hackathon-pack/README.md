@@ -22,7 +22,7 @@ npm run build
 
 | Path | Purpose |
 | --- | --- |
-| `src/` | `OmiMock`, the local TypeScript SDK, types, and synthetic seed data. |
+| `src/` | `OmiMock`, the local TypeScript SDK, types, synthetic seed data, and named scenarios. |
 | `examples/vanilla-html/` | A deliberately plain, clickable macOS/iOS-oriented HTML starter. |
 | `tests/` | Executable examples of the SDK contract. |
 | `docs/sdk-guide.md` | How agents should use and extend the mock. |
@@ -33,8 +33,21 @@ npm run build
 
 - Use `OmiMock` for local interactions: no sign-in, API keys, device, or network is needed.
 - Treat all included data as **synthetic**. It resembles useful Omi capability shapes, not an actual account.
-- You may change the seed, call the mock methods, subscribe to events, or replace the mock implementation behind the same interface.
+- You may select a named scenario, override the fixture with a seed, call the mock methods, subscribe to events, or replace the mock implementation behind the same interface.
 - Do not treat this pack as an authoritative API schema or put real conversation, memory, or account data into prototypes.
+
+For a richer starting point, pass a scenario when constructing the mock:
+
+```ts
+import { OmiMock } from './src';
+
+const omi = new OmiMock({ scenario: 'power-user' });
+```
+
+Available scenarios include `default`, `first-run`, `power-user`, `recording`,
+`processing`, `offline-recovery`, and `empty-search`. All fixtures are local,
+synthetic, and cloned per mock instance. An explicit `seed` override wins over
+the selected scenario; arrays replace only that fixture area.
 
 ## Fastest useful first move for an agent
 

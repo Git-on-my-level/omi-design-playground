@@ -1,4 +1,5 @@
 import { defaultOmiSeed } from './seed';
+import { getOmiScenario } from './scenarios';
 import type {
   AssistantReply,
   CaptureSession,
@@ -9,6 +10,7 @@ import type {
   OmiEvent,
   OmiEventName,
   OmiMockOptions,
+  OmiScenarioName,
   OmiSeed,
   OmiSnapshot,
   Platform,
@@ -18,14 +20,27 @@ import type {
 
 const copy = <T>(value: T): T => structuredClone(value);
 
-function mergeSeed(seed?: OmiSeed): OmiSnapshot {
-  const base = copy(defaultOmiSeed);
+function mergeSeed(seed: OmiSeed | undefined, scenario: OmiScenarioName = 'default'): OmiSnapshot {
+  const scenarioSeed = getOmiScenario(scenario);
+  const defaultSeed = copy(defaultOmiSeed);
+  const base: OmiSnapshot = {
+    ...defaultSeed,
+    ...scenarioSeed,
+    me: { ...defaultSeed.me, ...scenarioSeed.me },
+    device: { ...defaultSeed.device, ...scenarioSeed.device },
+    capture: {
+      ...defaultSeed.capture,
+      ...scenarioSeed.capture,
+      liveTranscript: scenarioSeed.capture?.liveTranscript ?? defaultSeed.capture.liveTranscript,
+    },
+  };
+  const override = seed ? copy(seed) : undefined;
   return {
     ...base,
-    ...seed,
-    me: { ...base.me, ...seed?.me },
-    device: { ...base.device, ...seed?.device },
-    capture: { ...base.capture, ...seed?.capture, liveTranscript: seed?.capture?.liveTranscript ?? base.capture.liveTranscript },
+    ...override,
+    me: { ...base.me, ...override?.me },
+    device: { ...base.device, ...override?.device },
+    capture: { ...base.capture, ...override?.capture, liveTranscript: override?.capture?.liveTranscript ?? base.capture.liveTranscript },
   };
 }
 
@@ -41,7 +56,7 @@ export class OmiMock {
   private readonly now: () => Date;
 
   constructor(options: OmiMockOptions = {}) {
-    this.state = mergeSeed(options.seed ? copy(options.seed) : undefined);
+    this.state = mergeSeed(options.seed, options.scenario);
     this.latencyMs = options.latencyMs ?? 120;
     this.processingMs = options.processingMs ?? 600;
     this.now = options.now ?? (() => new Date());
@@ -102,15 +117,18 @@ export class OmiMock {
 
   async startCapture(platform: Platform): Promise<CaptureSession> {
     await this.delay();
+    if (this.state.capture.status !== 'idle') {
+      throw new Error('Cannot start a capture while another capture is active or processing.');
+    }
     this.state.capture = {
       ...this.state.capture,
       id: `capture-${this.now().getTime()}`,
       status: 'capturing',
+      platform,
       startedAt: this.now().toISOString(),
       liveTranscript: [],
     };
     this.emit({ type: 'capture.changed', capture: copy(this.state.capture) });
-    void platform; // Platform is intentionally available to prototype authors for branching and analytics mocks.
     return copy(this.state.capture);
   }
 
@@ -133,7 +151,8 @@ export class OmiMock {
   async stopCapture(): Promise<Conversation> {
     await this.delay();
     if (this.state.capture.status !== 'capturing') throw new Error('There is no active capture to stop.');
-    this.state.capture.status = 'processing';
+    const session = copy(this.state.capture);
+    this.state.capture = { ...session, status: 'processing' };
     this.emit({ type: 'capture.changed', capture: copy(this.state.capture) });
 
     await this.delayBy(this.processingMs);
@@ -142,12 +161,12 @@ export class OmiMock {
     const conversation: Conversation = {
       id: `conv-${this.now().getTime()}`,
       title: 'New captured conversation',
-      startedAt: this.state.capture.startedAt ?? endedAt,
+      startedAt: session.startedAt ?? endedAt,
       updatedAt: endedAt,
-      source: 'device',
+      source: session.platform ?? 'device',
       summary: 'A newly captured conversation, ready for a prototype to summarize or organize.',
       people: ['person-me'],
-      segments: copy(this.state.capture.liveTranscript),
+      segments: copy(session.liveTranscript),
     };
     this.state.conversations.unshift(conversation);
     this.state.capture = { id: 'capture-current', status: 'idle', liveTranscript: [] };
@@ -169,6 +188,7 @@ export class OmiMock {
     const action = this.state.actions.find((item) => item.id === id);
     if (!action) throw new Error(`Action ${id} was not found.`);
     action.status = action.status === 'open' ? 'done' : 'open';
+    this.emit({ type: 'action.changed', action: copy(action) });
     return copy(action);
   }
 

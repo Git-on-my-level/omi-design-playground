@@ -1,4 +1,5 @@
 export type Platform = 'macos' | 'ios';
+export type OmiScenarioName = 'default' | 'first-run' | 'power-user' | 'recording' | 'processing' | 'offline-recovery' | 'empty-search';
 export type DeviceConnection = 'connected' | 'connecting' | 'disconnected';
 export type CaptureStatus = 'idle' | 'capturing' | 'processing';
 export type MemoryKind = 'fact' | 'preference' | 'relationship' | 'commitment' | 'insight';
@@ -7,6 +8,7 @@ export type OmiEventName =
   | 'conversation.updated'
   | 'memory.created'
   | 'device.changed'
+  | 'action.changed'
   | 'assistant.responded';
 
 export interface Person {
@@ -76,6 +78,7 @@ export interface SuggestedAction {
 export interface CaptureSession {
   id: string;
   status: CaptureStatus;
+  platform?: Platform;
   startedAt?: string;
   liveTranscript: TranscriptSegment[];
 }
@@ -102,6 +105,7 @@ export type OmiEvent =
   | { type: 'conversation.updated'; conversation: Conversation }
   | { type: 'memory.created'; memory: Memory }
   | { type: 'device.changed'; device: OmiDevice }
+  | { type: 'action.changed'; action: SuggestedAction }
   | { type: 'assistant.responded'; reply: AssistantReply };
 
 export type EventHandler<T extends OmiEventName> = (event: Extract<OmiEvent, { type: T }>) => void;
@@ -119,6 +123,7 @@ export interface OmiSeed {
 
 export interface OmiMockOptions {
   seed?: OmiSeed;
+  scenario?: OmiScenarioName;
   latencyMs?: number;
   /** Time that stopCapture leaves the session visibly processing. */
   processingMs?: number;
