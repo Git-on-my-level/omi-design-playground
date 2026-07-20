@@ -31,11 +31,12 @@ prototypes/
   <concept-name>/     One self-contained concept per directory
 reference/
   hackathon-pack/     Unmodified supplied mock SDK, docs, and example harness
+  impeccable/         Vendored design-skill reference (not a Cursor install)
 scripts/
   serve-prototype.sh  Local Vite launcher for any prototype directory
 ```
 
-Each prototype should be self-contained HTML/CSS/JS. Use the reference pack's `src/` and docs when a concept needs mock Omi state or interactions; keep its contents unchanged so it remains a stable capability reference.
+Each prototype should be self-contained HTML/CSS/JS. Use the reference pack's `src/` and docs when a concept needs mock Omi state or interactions; keep its contents unchanged so it remains a stable capability reference. For design craft guidance, see `reference/impeccable/` and `AGENTS.md`.
 
 ## Verify the supplied pack
 

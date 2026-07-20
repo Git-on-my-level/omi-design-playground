@@ -8,9 +8,10 @@ Spray-and-pray UI/UX exploration. Many distinct concepts beat one polished app.
 | --- | --- |
 | `prototypes/<name>/` | **Your concepts.** One idea per directory. Self-contained HTML/CSS/JS(TS). |
 | `reference/hackathon-pack/` | **Read-only capability pack.** Mock SDK, synthetic scenarios, docs, diagnostic harness. |
+| `reference/impeccable/` | **Read-only design skill reference** ([pbakaus/impeccable](https://github.com/pbakaus/impeccable)). Craft/critique guidance—not a Cursor install. |
 | `scripts/serve-prototype.sh` | Serve any prototype by name. |
 
-Do **not** put new concepts inside the pack (`examples/`, `src/`, etc.). Do **not** edit the pack unless the user explicitly asks to update the reference.
+Do **not** put new concepts inside `reference/`. Do **not** edit reference trees unless the user explicitly asks to update them. Do **not** install Impeccable into Cursor or other harnesses from this repo.
 
 ## New prototype checklist
 
@@ -35,6 +36,16 @@ Each prototype is a **separate bet**, not a revision of another:
 - Local only: no sign-in, device, API keys, or real account data. All fixtures are synthetic.
 
 Useful loop from the brief: **capture → understand → remember → retrieve → act**. Fake anything outside the SDK if it serves the concept.
+
+## Design craft (Impeccable)
+
+When shaping or reviewing a prototype’s UI, use `reference/impeccable/` as optional guidance:
+
+- Start: `reference/impeccable/skill/SKILL.src.md` and the product register `skill/reference/product.md` (app UI) or `skill/reference/brand.md` (marketing).
+- Commands live as markdown under `reference/impeccable/skill/reference/` (`craft`, `critique`, `polish`, `distill`, `typeset`, …).
+- Upstream overview: `reference/impeccable/README.md`. Pin/source note: `reference/impeccable/SOURCE.md`.
+
+Impeccable is a **taste reference**, not a shared component library. Each prototype still gets its own visual language.
 
 ## Working norms
 
