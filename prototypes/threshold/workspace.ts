@@ -75,6 +75,51 @@ const GOAL_DEFINITIONS: GoalDefinition[] = [
   },
 ];
 
+/**
+ * A screen Omi says it saw while a task was moving. Fabricated: the fixture has
+ * no screenshots and nothing here captures a real screen. These are rendered as
+ * mock-window thumbnails and labelled "seen on screen", never presented as real
+ * images. `state` places the screen on the arc from first opened to done.
+ */
+export interface ScreenCapture {
+  /** App the screen was seen in. Drives the mock chrome and its glyph. */
+  app: string;
+  /** The one line of what was on screen. */
+  caption: string;
+  /** When it was on screen, already formatted for display. */
+  at: string;
+  state: 'opened' | 'progress' | 'done';
+}
+
+/*
+ * Fabricated screen trails, keyed by action id. The SDK has no screenshots, so
+ * every entry here is written, not observed — the app renders them as mock
+ * windows labelled "seen on screen". Only a handful of actions carry one; the
+ * rest fall back to their transcript receipt alone.
+ */
+const SCREEN_CAPTURES: Record<string, ScreenCapture[]> = {
+  'action-001': [
+    { app: 'Pages', caption: 'Started the decision trail doc', at: '2:12 PM', state: 'opened' },
+    { app: 'Drive', caption: 'Shared the workshop export folder', at: '3:41 PM', state: 'progress' },
+    { app: 'Mail', caption: 'Draft to Priya, not sent', at: '5:06 PM', state: 'done' },
+  ],
+  'action-002': [
+    { app: 'Meet', caption: 'Export pilot review with Taylor', at: '4:27 PM', state: 'opened' },
+    { app: 'Code review', caption: 'Export shape pull request', at: '5:02 PM', state: 'progress' },
+  ],
+  'action-005': [
+    { app: 'Pages', caption: 'Smallest useful slice outline', at: '10:20 AM', state: 'opened' },
+    { app: 'Mail', caption: 'Sent the outline to Avery', at: '11:58 AM', state: 'done' },
+  ],
+  'action-006': [
+    { app: 'Slack', caption: 'Morgan on the workaround pattern', at: '4:48 PM', state: 'opened' },
+  ],
+  'action-011': [
+    { app: 'Figma', caption: 'Thread-first prototype frame', at: '1:33 PM', state: 'opened' },
+    { app: 'Figma', caption: 'Progressive map reveal', at: '2:15 PM', state: 'progress' },
+  ],
+};
+
 export interface TaskView {
   action: SuggestedAction;
   goal: GoalView;
@@ -83,6 +128,8 @@ export interface TaskView {
   source?: Conversation;
   dueLabel?: string;
   overdue: boolean;
+  /** Fabricated screen-capture trail, when one is defined for this action. */
+  screens?: ScreenCapture[];
 }
 
 export interface GoalView {
@@ -189,6 +236,7 @@ export function buildWorkspace(snapshot: OmiSnapshot): Workspace {
         source: action.conversationId ? conversationById.get(action.conversationId) : undefined,
         dueLabel: dueLabel(action.dueAt),
         overdue: action.status === 'open' && action.dueAt !== undefined && new Date(action.dueAt) < FIXTURE_NOW,
+        screens: SCREEN_CAPTURES[action.id],
       };
 
       goal.tasks.push(task);

@@ -15,7 +15,7 @@
  * list you did not type.
  */
 import type { Memory, MemoryKind } from '../../reference/hackathon-pack/src/types';
-import { firstName, initials, relativeDays, type GoalView, type PersonView, type TaskView, type Workspace } from './workspace';
+import { firstName, initials, relativeDays, type GoalView, type PersonView, type ScreenCapture, type TaskView, type Workspace } from './workspace';
 
 export interface Nav {
   /** Tasks, lensed on one person. */
@@ -64,6 +64,57 @@ function goalChip(goal: GoalView, nav: Nav): HTMLElement {
 }
 
 /* ---------------------------------------------------------------------- *
+ * Screenshot evidence
+ *
+ * Synthetic screen captures, drawn as small mock windows. The fixture has no
+ * screenshots and nothing captures a real screen, so these are wireframes plus a
+ * caption and a timestamp, labelled "seen on screen". `state` places each on the
+ * arc from opened to done, so a receipt shows how far along, not just its source.
+ * ---------------------------------------------------------------------- */
+
+const STATE_LABEL: Record<ScreenCapture['state'], string> = {
+  opened: 'Opened',
+  progress: 'In progress',
+  done: 'Done',
+};
+
+/** A wireframe stand-in for the app that was on screen. Suggestive, not literal. */
+function shotWire(app: string): string {
+  if (app === 'Meet') {
+    return '<div class="wire wire-meet"><span></span><span></span><span></span><span></span></div>';
+  }
+  if (app === 'Slack' || app === 'Mail') {
+    return '<div class="wire wire-msg"><span class="wl"></span><span class="wl short"></span><span class="wl"></span></div>';
+  }
+  if (app === 'Code review') {
+    return '<div class="wire wire-code"><span class="wl"></span><span class="wl short"></span><span class="wl"></span><span class="wl short"></span></div>';
+  }
+  return '<div class="wire wire-doc"><span class="wl"></span><span class="wl"></span><span class="wl short"></span></div>';
+}
+
+function shotThumb(screen: ScreenCapture): string {
+  return `
+    <figure class="shot shot-${screen.state}">
+      <div class="shot-frame">
+        <div class="shot-bar"><i></i><i></i><i></i><span>${screen.app}</span></div>
+        <div class="shot-body">${shotWire(screen.app)}</div>
+      </div>
+      <figcaption class="shot-cap">${screen.caption}</figcaption>
+      <p class="shot-meta"><span class="shot-state">${STATE_LABEL[screen.state]}</span>${screen.at}</p>
+    </figure>`;
+}
+
+export function screenStrip(screens: ScreenCapture[]): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'screens';
+  wrap.innerHTML = `
+    <p class="screens-label">Seen on screen</p>
+    <div class="screens-row">${screens.map(shotThumb).join('')}</div>
+  `;
+  return wrap;
+}
+
+/* ---------------------------------------------------------------------- *
  * Task row
  * ---------------------------------------------------------------------- */
 
@@ -104,18 +155,25 @@ export function taskRow(task: TaskView, workspace: Workspace, nav: Nav, options:
     wrap.classList.toggle('is-done');
   });
 
-  /* The receipt. Every claim can show the line it came from. */
+  /*
+   * The receipt: why believe this (the transcript line), and now how far along
+   * (the screens Omi says it saw). Either alone is enough to make the row unfold.
+   */
   const segments = task.source?.segments ?? [];
-  if (segments.length > 0) {
+  const screens = task.screens ?? [];
+  if (segments.length > 0 || screens.length > 0) {
     wrap.classList.add('has-receipt');
     const slot = wrap.querySelector<HTMLElement>('[data-receipt]')!;
-    slot.innerHTML = `
-      <p class="receipt-src">${task.source!.title} · ${relativeDays(task.source!.startedAt)}</p>
-      ${segments
-        .slice(0, 3)
-        .map((s) => `<p class="receipt-l"><span>${s.speaker}:</span> ${s.text}</p>`)
-        .join('')}
-    `;
+    if (segments.length > 0) {
+      slot.innerHTML = `
+        <p class="receipt-src">${task.source!.title} · ${relativeDays(task.source!.startedAt)}</p>
+        ${segments
+          .slice(0, 3)
+          .map((s) => `<p class="receipt-l"><span>${s.speaker}:</span> ${s.text}</p>`)
+          .join('')}
+      `;
+    }
+    if (screens.length > 0) slot.append(screenStrip(screens));
     wrap.querySelector<HTMLElement>('.task-row')!.addEventListener('click', () => {
       const open = wrap.classList.toggle('is-open');
       slot.style.height = open ? `${slot.scrollHeight}px` : '0px';

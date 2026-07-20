@@ -13,6 +13,7 @@ import type { Conversation, Memory, OmiSnapshot, Person, SuggestedAction } from 
 import { mountMacStage } from '../_macos-stage';
 import { createVoiceInput, pushToTalk } from '../_voice';
 import { openOmiApp, type OmiChat } from './chat';
+import { buildAlert, type Trigger } from './triggers';
 import { buildWorkspace, FIXTURE_NOW, firstName, relativeDays, type Workspace } from './workspace';
 import './style.css';
 
@@ -22,8 +23,15 @@ import './style.css';
 
 /** Fixture seconds elapsed per real second. Four fixture minutes ≈ 20s of demo. */
 const TIME_COMPRESSION = 12;
-/** How far out a meeting is when the card arrives. */
+/** How far out a meeting is when a calendar alert fires. */
 const LEAD_SECONDS = 4 * 60;
+/**
+ * How long an app-triggered card dwells before the moment passes and it expires.
+ * There is no real clock behind a Slack DM, so it borrows the calendar's lead.
+ */
+const DWELL_SECONDS = LEAD_SECONDS;
+/** The alert sits alone before the card it causes arrives. */
+const ALERT_HOLD_MS = 1500;
 /** Quiet beat between one card leaving and the next arriving. */
 const LULL_MS = 2200;
 
@@ -132,12 +140,68 @@ function buildBrief(person: Person, snapshot: OmiSnapshot): Brief | undefined {
   };
 }
 
-/** Fabricated calendar: whoever you owe something to, in the order you owe it. */
-function upcoming(snapshot: OmiSnapshot): Brief[] {
-  return snapshot.people
-    .filter((person) => person.id !== snapshot.me.id)
-    .map((person) => buildBrief(person, snapshot))
-    .filter((brief): brief is Brief => brief !== undefined);
+/* ---------------------------------------------------------------------- *
+ * Triggers
+ *
+ * A card no longer just appears on a compressed clock — it arrives because of
+ * something visible on screen. Each person's card is caused by one screen event,
+ * fabricated here: a calendar alert, a Meet pre-join, a Slack DM, a mail reply.
+ * All four are synthetic; the fixture has no schedule and Omi is not watching a
+ * real screen. See the README.
+ * ---------------------------------------------------------------------- */
+
+/** One card, and the on-screen event that causes it to arrive. */
+interface ScreenEvent {
+  brief: Brief;
+  trigger: Trigger;
+}
+
+const TRIGGERS: Record<string, Trigger> = {
+  'person-priya': {
+    kind: 'calendar',
+    event: 'Sync with Priya Shah',
+    where: 'Video call',
+    leadSeconds: LEAD_SECONDS,
+    eyebrow: 'Calendar',
+    why: 'Because your sync with Priya is in 4 minutes.',
+  },
+  'person-taylor': {
+    kind: 'meet',
+    heading: 'Export pilot review',
+    preview: 'Taylor Reed is in the call',
+    eyebrow: 'Meet · joining now',
+    why: 'Because the export pilot review just started.',
+  },
+  'person-morgan': {
+    kind: 'slack',
+    heading: 'Morgan Ellis',
+    preview: 'Did the workaround pattern hold up?',
+    eyebrow: 'Slack · Morgan',
+    why: 'Because Morgan just messaged you.',
+  },
+  'person-quinn': {
+    kind: 'mail',
+    heading: 'Quinn Ellis',
+    preview: 'Re: the next practice-sharing call',
+    eyebrow: 'Mail · Quinn',
+    why: 'Because Quinn replied about the practice-sharing call.',
+  },
+};
+
+/** The order cards arrive in. Priya leads: a calendar sync is the clearest case. */
+const TRIGGER_ORDER = ['person-priya', 'person-taylor', 'person-morgan', 'person-quinn'];
+
+/** Each on-screen event, paired with the card it will cause. */
+function screenEvents(snapshot: OmiSnapshot): ScreenEvent[] {
+  const events: ScreenEvent[] = [];
+  for (const id of TRIGGER_ORDER) {
+    const person = snapshot.people.find((p) => p.id === id);
+    const trigger = TRIGGERS[id];
+    if (!person || !trigger) continue;
+    const brief = buildBrief(person, snapshot);
+    if (brief) events.push({ brief, trigger });
+  }
+  return events;
 }
 
 /* ---------------------------------------------------------------------- *
@@ -153,10 +217,20 @@ function countdownLabel(secondsOut: number): string {
   return `in ${Math.ceil(secondsOut / 60)} min`;
 }
 
-function buildCard(brief: Brief): HTMLElement {
+function buildCard(brief: Brief, trigger: Trigger): HTMLElement {
   const card = document.createElement('article');
   card.className = 'card is-entering';
   card.tabIndex = 0;
+
+  /*
+   * The eyebrow now names the source. A calendar event has a real time, so its
+   * countdown lives in `data-when` and keeps ticking; the app triggers have no
+   * clock, so their source label is the whole of it.
+   */
+  const whenHtml =
+    trigger.kind === 'calendar'
+      ? `<span class="when"><span class="src">${trigger.eyebrow}</span> · <span class="when-count" data-when>in 4 min</span></span>`
+      : `<span class="when when-static">${trigger.eyebrow}</span>`;
 
   const support = brief.support
     .map(
@@ -175,9 +249,10 @@ function buildCard(brief: Brief): HTMLElement {
   card.innerHTML = `
     <p class="eyebrow">
       <span class="who">${brief.person.name}</span>
-      <span class="when" data-when>in 4 min</span>
+      ${whenHtml}
     </p>
     <h1 class="fact">${brief.fact}</h1>
+    <p class="why-now">${trigger.why}</p>
     <div class="fold" data-fold>
       <div class="fold-inner" data-fold-inner>
         ${support ? `<ul class="support">${support}</ul>` : ''}
@@ -204,24 +279,53 @@ function buildCard(brief: Brief): HTMLElement {
  * One card's life: arrive, count down, be dismissed or expire.
  * ---------------------------------------------------------------------- */
 
-let sequence: Brief[] = [];
+let sequence: ScreenEvent[] = [];
 /** Goals, people, and tasks, resolved once. The app window reads from this. */
 let workspace: Workspace;
 let index = 0;
 let ticker: number | undefined;
+/** The system chrome currently on screen, if any. Never more than one. */
+let currentAlert: HTMLElement | undefined;
 
-function present(brief: Brief): void {
-  const card = buildCard(brief);
+/** The alert slides off as the card arrives — one object holds the corner. */
+function dismissAlert(): void {
+  if (!currentAlert) return;
+  const leaving = currentAlert;
+  currentAlert = undefined;
+  leaving.classList.add('is-leaving');
+  window.setTimeout(() => leaving.remove(), 420);
+}
+
+/**
+ * One screen event: the system alert arrives, holds a beat, and hands the corner
+ * to the Omi card it caused. The alert is the desktop's own chrome; the card is
+ * Omi's. Their contrast — solid versus glass — is how you know the card was
+ * never a window.
+ */
+function present(event: ScreenEvent): void {
+  dismissAlert();
+  const alert = buildAlert(event.trigger, FIXTURE_NOW.getDate());
+  currentAlert = alert;
+  stage.surface.append(alert);
+
+  window.setTimeout(() => {
+    dismissAlert();
+    showCard(event.brief, event.trigger);
+  }, ALERT_HOLD_MS);
+}
+
+function showCard(brief: Brief, trigger: Trigger): void {
+  const card = buildCard(brief, trigger);
   root!.replaceChildren(card);
   card.focus({ preventScroll: true });
 
-  const whenEl = card.querySelector<HTMLElement>('[data-when]')!;
+  const whenEl = card.querySelector<HTMLElement>('[data-when]');
   const foldEl = card.querySelector<HTMLElement>('[data-fold]')!;
   const foldInner = card.querySelector<HTMLElement>('[data-fold-inner]')!;
   const utteranceEl = card.querySelector<HTMLElement>('[data-utterance]')!;
   const bars = [...card.querySelectorAll<HTMLElement>('[data-wave] i')];
 
-  let secondsOut = LEAD_SECONDS;
+  let secondsOut = trigger.kind === 'calendar' ? trigger.leadSeconds : DWELL_SECONDS;
   let unfolded = false;
   let done = false;
   /** Held open by the chat window or an active hold. The meeting waits. */
@@ -239,8 +343,12 @@ function present(brief: Brief): void {
   ticker = window.setInterval(() => {
     if (paused) return;
     secondsOut -= TIME_COMPRESSION / 4;
-    whenEl.textContent = countdownLabel(Math.max(0, Math.round(secondsOut)));
-    whenEl.classList.toggle('is-imminent', secondsOut <= 60);
+    // Only a calendar event has a real time to count down; app cards dwell,
+    // then let the moment pass quietly at zero.
+    if (whenEl) {
+      whenEl.textContent = countdownLabel(Math.max(0, Math.round(secondsOut)));
+      whenEl.classList.toggle('is-imminent', secondsOut <= 60);
+    }
     if (secondsOut <= 0) expire();
   }, 250);
 
@@ -470,7 +578,7 @@ function next(): void {
 async function start(): Promise<void> {
   const snapshot = await omi.getSnapshot();
   workspace = buildWorkspace(snapshot);
-  sequence = upcoming(snapshot);
+  sequence = screenEvents(snapshot);
 
   if (sequence.length === 0) return;
 

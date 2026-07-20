@@ -13,7 +13,7 @@
  */
 import type { Conversation, Memory } from '../../reference/hackathon-pack/src/types';
 import { createVoiceInput, pushToTalk } from '../_voice';
-import { renderGoals, renderPeople, renderTasks, type Nav } from './views';
+import { renderGoals, renderPeople, renderTasks, screenStrip, type Nav } from './views';
 import { firstName, initials, type PersonView, type TaskView, type Workspace } from './workspace';
 
 export interface OmiAppOptions {
@@ -315,6 +315,10 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
       </div>
       <span class="ctx-kind">Task</span>
     `;
+
+    if (task!.screens?.length) {
+      card.querySelector<HTMLElement>('.ctx-body')!.append(screenStrip(task!.screens));
+    }
 
     const check = card.querySelector<HTMLButtonElement>('.ctx-check')!;
     check.addEventListener('click', (event) => {

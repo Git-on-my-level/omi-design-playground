@@ -2,7 +2,9 @@
 
 **The experience:** the twenty seconds before you walk into the room. Not recall — readiness.
 
-A card arrives on its own because a meeting is close. It says the one thing it would cost you to have forgotten, and then it leaves. You never search, never navigate, and never see two cards at once.
+A card arrives on its own because something on screen just happened — a calendar alert for a meeting that is close, or a known person's app coming forward. It says the one thing it would cost you to have forgotten, and then it leaves. You never search, never navigate, and never see two cards at once.
+
+The trigger is visible: a native-looking system alert slides in first, holds a beat, and hands the corner to the Omi card it caused. The card names the source in its eyebrow (`Calendar · in 4 min`, `Slack · Morgan`) and carries a dim "why now" line — the timing equivalent of its "why believe this" receipt.
 
 ```bash
 make threshold
@@ -10,7 +12,7 @@ make threshold
 
 ## Try first
 
-1. **Wait.** The card arrives by itself, counts down, and expires at T-0 if you ignore it. Doing nothing is a supported path.
+1. **Wait.** A system alert arrives first — a calendar notification, a Meet pre-join, a Slack DM, a mail reply — and a beat later the card arrives because of it. When the source is a calendar event the card counts down and expires at T-0; when it is an app coming forward it dwells and then passes. Doing nothing is a supported path either way.
 2. **Flick it sideways.** Velocity-tracked throw. It does not come back, and there is no undo.
 3. **Drag it down.** The card unfolds to the transcript lines that produced the claim. Every fact can show its receipt — this is the trust move, and it's why the concept isn't presumptuous.
 4. **Hold right ⌘ and talk.** The card starts listening: the footer becomes a live meter and your words land in the card. Release and the question carries into the chat window. The countdown pauses while you hold — you are engaging, so the meeting waits.
@@ -34,7 +36,7 @@ Two details worth trying:
 
 **Looking through one dimension groups by the other.** Lens on a goal and it groups by person — *who owes what*. Lens on a person and it groups by goal — *toward what*. Unlensed, goals are the frame.
 
-**Every task can show its receipt.** Click a task row and it unfolds the verbatim transcript lines that produced it, with the conversation and when it happened. This is the Omi part: no other tracker can do it, and it is the reason to trust a list you did not type.
+**Every task can show its receipt.** Click a task row and it unfolds the verbatim transcript lines that produced it, with the conversation and when it happened. Some tasks also carry **screen-capture evidence** — small framed mock windows labelled "seen on screen" that track the work from *opened* to *in progress* to *done*. So a receipt shows both why to believe the task exists and how far along it is. This is the Omi part: no other tracker can do it, and it is the reason to trust a list you did not type.
 
 Memory lives in the person lens header — two lines, then "n more" — because it is context for the commitments below it rather than a page of its own.
 
@@ -58,7 +60,8 @@ Full brief: [ideas/threshold.md](../../ideas/threshold.md).
 
 Fabricated, in order of how much it matters:
 
-- **The calendar.** There is no meeting and no schedule in the fixture. Proximity is invented, and the clock runs on compressed fixture time (12 fixture seconds per real second).
+- **The triggers.** There is no meeting, no schedule, and no screen feed in the fixture, and Omi is not really watching your screen here. The four screen events that cause the cards — a calendar alert for Priya, a Meet pre-join for Taylor, a Slack DM from Morgan, a mail reply from Quinn — are written, along with their times and preview text. Making the calendar *visible* is more honest than the old invisible clock, not less: you can now see the thing the card claims to be reacting to. But the events themselves are synthetic, the system alerts are mock chrome (solid, so they read as the OS rather than as Omi), and the calendar countdown still runs on compressed fixture time (12 fixture seconds per real second). App-triggered cards have no real clock, so they dwell for the same lead and then pass.
+- **The screen captures.** The "seen on screen" thumbnails on some tasks are not real screenshots — nothing captures your screen. They are mock windows drawn from HTML and CSS (app chrome, a wireframe body, a caption, a timestamp, and an *opened / in progress / done* state), defined in a small hand-written map keyed by action id in `workspace.ts`. They are labelled "seen on screen" in the UI so the fabrication reads as exactly that; the label is the honest part, and nothing claims a real capture happened.
 - **The transcription.** `_voice` detects that you are speaking; it does not know what you said. The utterance is a fixed string revealed at a speaking cadence, and the meter is driven by real level data. If the microphone permission is denied — or you are in headless Chrome — the level comes from a synthetic envelope and nothing on screen changes.
 - **Goals.** The SDK has no goals. The five here are derived from the conversations their actions came out of — commitments made in the workshop debrief and the roadmap workshop really are about the same thing, and grouping by source conversation recovers that. Hardcoding action IDs to goal IDs would look identical on screen and be a lie about where the structure came from. The titles and intents are written, not derived.
 - **The assistant's replies.** Composed locally from fixture joins. The pack's `askAssistant` returns a generic "a useful starting point is…" string, which reads as broken in a presentable surface, so it is not used. Free text in the composer lands on the nearest canned prompt.

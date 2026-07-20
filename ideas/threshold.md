@@ -16,9 +16,29 @@ This is not recall. It is **readiness**.
 - **Initiative** — the app speaks first; the user never navigates.
 - **Surface** — one card. No nav, no list, no back button, nothing to browse.
 
+## Why the card arrives
+
+The card earns its content — every fact can show its receipt. It must also earn its
+*timing*. So the trigger is not an invisible clock; it is something visible on screen that
+just happened, and the card arrives *because of* it:
+
+- A **calendar alert** slides in — native system chrome, solid, unmistakably the OS and not
+  Omi — for a meeting that is close. A beat later the card arrives, its countdown descending
+  from the alert's time.
+- Or a **known person's context comes to the foreground**: a Meet pre-join, a Slack DM, a
+  mail reply. When it is someone Omi knows, the card arrives; when it is not, nothing does.
+
+The card names the source in its eyebrow (`Calendar · in 4 min`, `Slack · Morgan`) and carries
+one dim **"why now"** line naming the signal — *"Because your sync with Priya is in 4 minutes."*
+This is the timing counterpart to the receipt: the receipt is "why believe this", the why-now
+line is "why now". The triggers are always the *cause* of a single card, never a browsable log of
+what Omi saw. The moment there is a list of triggers, this has become a notification center.
+
 ## The demo
 
-Time-compress the calendar so a meeting is always 60 seconds out. The panel slides in over whatever is on screen. Interactions, in order of how much they ask of you:
+A short sequence of screen events, each tied to one brief. The system alert slides in, holds a
+beat, and hands the corner to the Omi card it caused — one object rests there at a time.
+Interactions, in order of how much they ask of you:
 
 1. **Read it.** It self-dismisses when the meeting starts.
 2. **Push it away** — a flick sends it off-screen with real momentum; it does not come back.
@@ -40,7 +60,7 @@ The app behind the door has one substrate and two lenses. **Tasks are the only o
 
 That is the correction that made it simple. The first build gave people their own expanded page: open items, goals, memories, conversation history, four stacked sections. It was a CRM record sitting next to a task tracker, and the two disagreed about which object was primary. Making a person a *lens* answers it — the commitment is primary, and a person is a question you ask about it. Memory survives as a compact context block in the lens header, which is the right size for it: it is what you need to know before you act on the list below, not a page to browse.
 
-Goals are derived from the conversations their commitments came out of, which is the only structure the fixture can honestly support. And every task can unfold its receipt — the verbatim line that produced it. That is the part no other tracker can copy.
+Goals are derived from the conversations their commitments came out of, which is the only structure the fixture can honestly support. And every task can unfold its receipt — the verbatim line that produced it, and, for some, the **screens Omi says it saw** while the work moved: small framed mock windows that track a task from *opened* through *in progress* to *done*, labelled "seen on screen". The receipt now answers two questions at once — why believe this, and how far along. That pairing is the part no other tracker can copy.
 
 That density is exactly what the card must never become. The card is one fact; the app is the whole graph. Keeping them in one prototype is deliberate — it is the argument that an interruption earns its place by being *narrower* than the thing it can open, not by being a smaller copy of it.
 
@@ -67,7 +87,7 @@ Discipline: **the ember appears once**. If two things are urgent, the card is wr
 - Body/meta: **Inter Tight**, 10–11px, uppercase only for the eyebrow (person + time-until).
 - Never more than **two type sizes visible at once**. The hierarchy is violent on purpose — one thing is roughly 2.5× everything else, and it is the only serif on the card.
 
-**Space** — the card is `306px` wide with `18px/20px` padding, and the resting state is **three elements only**: the eyebrow, the fact, and a slim footer. Everything else — what she cares about, when you last spoke, the receipt — lives behind the fold.
+**Space** — the card is `306px` wide with `18px/20px` padding, and the resting state is the eyebrow, the fact, one dim "why now" line bound to the fact as a caption, and a slim footer. The why-now line stays at eyebrow size and colour so it reads as a caption to the fact, not a second fact — it is the one addition the trigger model earns. Everything else — what she cares about, when you last spoke, the receipt — lives behind the fold.
 
 This is the correction that mattered most. The first build gave the fact 48px and put the supporting detail on the face of the card, which produced a 380×420 poster parked on your desktop. A surface that interrupts you has to earn its footprint, and a brief you read in six seconds does not need the area of a dialog. Compactness *is* the deference. The fact drops to 25px and still dominates, because everything around it is 10–11px.
 
@@ -98,7 +118,7 @@ The window it hands off to is **not** glass. Windows on this desktop are solid; 
 
 ## SDK hooks
 
-`OmiMock` → `memories` filtered by `people`, `conversations` for the last exchange with that person, `actions` with `dueAt` for open commitments. Calendar proximity is **fabricated** — label it synthetic in the note.
+`OmiMock` → `memories` filtered by `people`, `conversations` for the last exchange with that person, `actions` with `dueAt` for open commitments. The **triggers** are fabricated: the fixture has no schedule and no screen feed, so the calendar alerts, the app-foreground events, and their times and previews are written by hand. `Conversation.source` already carries `'macos' | 'ios' | 'device'`, so screen-origin context is honest where it is used, but the events that fire the cards are synthetic — label them so. The **screen captures** on tasks are likewise synthetic: mock windows drawn from HTML, never real screenshots, labelled "seen on screen".
 
 ## Failure mode to avoid
 

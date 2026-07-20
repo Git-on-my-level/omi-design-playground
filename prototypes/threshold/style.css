@@ -153,9 +153,29 @@ body {
   white-space: nowrap;
 }
 
+/* The source name reads as quiet metadata; the countdown beside it can flare. */
+.when .src,
+.when-static {
+  color: var(--ink-dim);
+}
+
 /* The one urgent thing gets the one ember. */
-.when.is-imminent {
+.is-imminent {
   color: var(--ember);
+}
+
+/* ---- why now: the dim line that names the signal ----------------------- */
+
+/*
+ * The card already shows "why believe this" behind the fold; this is "why now",
+ * bound to the fact as a caption. Kept dim and at eyebrow size so it never
+ * becomes a third type scale competing with the one fact above it.
+ */
+.why-now {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.42;
+  color: rgba(138, 128, 121, 0.85);
 }
 
 /* ---- the fact ---------------------------------------------------------- */
@@ -402,7 +422,7 @@ body {
 }
 
 /* The ember is already spoken for while listening, so the countdown yields. */
-.card.is-listening .when.is-imminent {
+.card.is-listening .is-imminent {
   color: var(--ink-dim);
 }
 
@@ -477,6 +497,155 @@ body {
   opacity: 0;
   filter: blur(4px);
   pointer-events: none;
+}
+
+/* ---- system chrome: the alert that causes the card --------------------- */
+
+/*
+ * The desktop's own notification, not Omi's. Solid and light on purpose — on
+ * this stage only the Omi card is vibrant glass, so a flat opaque surface reads
+ * at once as the operating system's. It arrives, holds a beat, and slides off
+ * as the card takes the corner, so only ever one thing rests there.
+ */
+.sys {
+  position: fixed;
+  top: 46px;
+  right: 22px;
+  z-index: 3;
+  display: flex;
+  gap: 11px;
+  width: 300px;
+  padding: 13px 14px;
+  border-radius: 16px;
+  color: #1c1b1f;
+  background: #fbfbfd;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 0.5px 0 0 rgba(255, 255, 255, 0.85) inset,
+    0 18px 46px -16px rgba(0, 0, 0, 0.5);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  animation: sysIn 340ms var(--settle) both;
+}
+
+@keyframes sysIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Handing the corner to the card: up and out, the way a dismissed alert goes. */
+.sys.is-leaving {
+  transition:
+    transform 400ms var(--settle),
+    opacity 320ms ease-out;
+  opacity: 0;
+  transform: translateY(-16px) scale(0.98);
+  pointer-events: none;
+}
+
+.sys-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.sys-app {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.sys-now {
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.34);
+}
+
+.sys-title {
+  margin: 3px 0 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #1c1b1f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sys-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* App glyph tiles: small, solid, unmistakably the app they stand for. */
+.sys-glyph {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.sys-glyph svg {
+  width: 23px;
+  height: 23px;
+}
+
+.sys-glyph--cal {
+  background: #fff;
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.12) inset;
+}
+
+.sys-cal-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 10px;
+  background: #ff453a;
+}
+
+.sys-cal-day {
+  margin-top: 7px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #1c1b1f;
+}
+
+.sys-glyph--meet {
+  background: #00832d;
+}
+.sys-glyph--slack {
+  background: #4a154b;
+}
+.sys-glyph--mail {
+  background: linear-gradient(160deg, #6cc6f7, #2b7fd4);
+}
+
+.sys-join {
+  display: inline-block;
+  margin-top: 9px;
+  padding: 5px 15px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #00832d;
 }
 
 /* ---- omi window -------------------------------------------------------- */
@@ -1407,6 +1576,144 @@ body {
   color: var(--ink-dim);
 }
 
+/* ---- screenshot evidence ----------------------------------------------- */
+
+/*
+ * Synthetic screen captures, rendered as small mock windows. They are drawn from
+ * HTML, never real images pulled from disk, and labelled "seen on screen" so the
+ * fabrication reads as exactly that. They join the transcript receipt as the
+ * "how far along" beside its "why believe this".
+ */
+.screens {
+  margin: 4px 0 12px 36px;
+}
+
+.screens-label {
+  margin: 2px 0 8px;
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(138, 128, 121, 0.75);
+}
+
+.screens-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.shot {
+  width: 138px;
+  margin: 0;
+}
+
+.shot-frame {
+  border-radius: 7px;
+  overflow: hidden;
+  border: 1px solid rgba(245, 239, 230, 0.1);
+  background: #1a1714;
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.6);
+}
+
+.shot-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 7px;
+  background: rgba(245, 239, 230, 0.06);
+  border-bottom: 1px solid rgba(245, 239, 230, 0.07);
+}
+
+.shot-bar i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(245, 239, 230, 0.28);
+}
+
+.shot-bar span {
+  margin-left: 4px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: rgba(245, 239, 230, 0.6);
+}
+
+.shot-body {
+  height: 58px;
+  padding: 9px;
+}
+
+/* Wireframe stand-ins for whatever was on screen. Suggestive, not literal. */
+.wire {
+  display: grid;
+  gap: 5px;
+  height: 100%;
+}
+
+.wire .wl {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(245, 239, 230, 0.16);
+}
+
+.wire .wl.short {
+  width: 60%;
+}
+
+.wire-meet {
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.wire-meet span {
+  border-radius: 4px;
+  background: rgba(245, 239, 230, 0.12);
+}
+
+.wire-code .wl {
+  background: rgba(232, 116, 59, 0.24);
+}
+
+.shot-cap {
+  margin: 7px 0 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(245, 239, 230, 0.78);
+}
+
+.shot-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 4px 0 0;
+  font-size: 10px;
+  color: var(--ink-dim);
+}
+
+.shot-state {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(245, 239, 230, 0.7);
+  background: rgba(245, 239, 230, 0.09);
+}
+
+.shot-opened .shot-state {
+  color: rgba(138, 128, 121, 0.95);
+}
+
+.shot-progress .shot-state {
+  color: rgba(232, 116, 59, 0.95);
+  background: rgba(232, 116, 59, 0.14);
+}
+
+.shot-done .shot-state {
+  color: #7bc98a;
+  background: rgba(123, 201, 138, 0.14);
+}
+
 /* ---- chips that cross dimensions --------------------------------------- */
 
 .pchip,
@@ -1650,4 +1957,9 @@ body {
 .ctx.is-linked:hover {
   border-color: rgba(232, 116, 59, 0.4);
   background: rgba(232, 116, 59, 0.09);
+}
+
+/* In the context card the strip is not indented under a checkbox. */
+.ctx .screens {
+  margin: 10px 0 0;
 }
