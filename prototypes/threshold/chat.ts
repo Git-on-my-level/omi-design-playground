@@ -13,7 +13,15 @@
  */
 import type { Conversation, Memory } from '../../reference/hackathon-pack/src/types';
 import { createVoiceInput, pushToTalk } from '../_voice';
-import { renderGoals, renderPeople, renderRewind, renderTasks, screenPreview, type Nav } from './views';
+import {
+  renderConversations,
+  renderGoals,
+  renderPeople,
+  renderRewind,
+  renderTasks,
+  screenPreview,
+  type Nav,
+} from './views';
 import { firstName, initials, type PersonView, type ScreenCapture, type TaskView, type Workspace } from './workspace';
 
 export interface OmiAppOptions {
@@ -49,6 +57,8 @@ interface Answer {
   text: string;
   quote?: string;
   cite?: string;
+  /** When the citation is a conversation, offer a link into its transcript. */
+  conversationId?: string;
 }
 
 interface Prompt {
@@ -90,6 +100,7 @@ const PROMPTS: Prompt[] = [
         text: `You committed to this: “${task.action.title}”. It came out of one exchange, not a thread — here is the line it came from.`,
         quote: line ? `${line.speaker}: ${line.text}` : undefined,
         cite: task.source?.title,
+        conversationId: task.source?.id,
       };
     },
   },
@@ -167,6 +178,7 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
         <button class="side-item" type="button" data-nav="tasks">Tasks</button>
         <button class="side-item" type="button" data-nav="goals">Goals</button>
         <button class="side-item" type="button" data-nav="people">People</button>
+        <button class="side-item" type="button" data-nav="conversations">Conversations</button>
         <button class="side-item" type="button" data-nav="rewind">Rewind</button>
       </nav>
       <div class="win-view" data-view></div>
@@ -199,31 +211,98 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
     scrollToEnd();
   }
 
+  /** A "View conversation" link, the transcript ingress that mirrors Rewind. */
+  function convoLink(id: string): HTMLElement {
+    const link = document.createElement('button');
+    link.type = 'button';
+    link.className = 'msg-cite-link';
+    link.textContent = 'View conversation';
+    link.addEventListener('click', () => nav.conversation(id));
+    return link;
+  }
+
+  function paintAnswer(block: HTMLElement, body: Answer): void {
+    const paragraphs = body.text
+      .split('\n')
+      .map((line) => `<p class="msg-line">${line}</p>`)
+      .join('');
+    block.innerHTML = `
+      ${paragraphs}
+      ${body.quote ? `<blockquote class="msg-quote">${body.quote}</blockquote>` : ''}
+      ${body.cite ? `<p class="msg-cite">${body.cite}</p>` : ''}
+    `;
+    if (body.conversationId) block.append(convoLink(body.conversationId));
+  }
+
+  /** Think, then stream words — the cadence of an agent, not a modal dump. */
   function addOmi(body: Answer, thinking = true): void {
     if (!thread) return;
     const block = document.createElement('div');
     block.className = 'msg msg-omi';
-    if (thinking) block.classList.add('is-thinking');
-    block.innerHTML = `<span class="dots"><i></i><i></i><i></i></span>`;
     thread.append(block);
+
+    if (!thinking) {
+      paintAnswer(block, body);
+      scrollToEnd();
+      return;
+    }
+
+    block.classList.add('is-thinking');
+    block.innerHTML = `<span class="dots"><i></i><i></i><i></i></span>`;
     scrollToEnd();
 
-    const settle = (): void => {
+    const thinkMs = 520 + Math.min(780, body.text.length * 6);
+    window.setTimeout(() => {
       block.classList.remove('is-thinking');
-      const paragraphs = body.text
-        .split('\n')
-        .map((line) => `<p class="msg-line">${line}</p>`)
-        .join('');
-      block.innerHTML = `
-        ${paragraphs}
-        ${body.quote ? `<blockquote class="msg-quote">${body.quote}</blockquote>` : ''}
-        ${body.cite ? `<p class="msg-cite">${body.cite}</p>` : ''}
-      `;
-      scrollToEnd();
-    };
+      const lines = body.text.split('\n');
+      block.replaceChildren();
+      let lineEl = document.createElement('p');
+      lineEl.className = 'msg-line';
+      block.append(lineEl);
 
-    if (thinking) window.setTimeout(settle, 620);
-    else settle();
+      const tokens = lines.flatMap((line, li) => {
+        const words = line.split(/(\s+)/).filter(Boolean);
+        return li < lines.length - 1 ? [...words, '\n'] : words;
+      });
+
+      let i = 0;
+      const tick = (): void => {
+        if (i >= tokens.length) {
+          if (body.quote) {
+            const quote = document.createElement('blockquote');
+            quote.className = 'msg-quote is-arriving';
+            quote.textContent = body.quote;
+            block.append(quote);
+          }
+          if (body.cite) {
+            const cite = document.createElement('p');
+            cite.className = 'msg-cite is-arriving';
+            cite.textContent = body.cite;
+            block.append(cite);
+          }
+          if (body.conversationId) {
+            const link = convoLink(body.conversationId);
+            link.classList.add('is-arriving');
+            block.append(link);
+          }
+          scrollToEnd();
+          return;
+        }
+        const token = tokens[i]!;
+        i += 1;
+        if (token === '\n') {
+          lineEl = document.createElement('p');
+          lineEl.className = 'msg-line';
+          block.append(lineEl);
+        } else {
+          lineEl.textContent = (lineEl.textContent ?? '') + token;
+        }
+        scrollToEnd();
+        const pause = token === '\n' ? 140 : token.trim() ? 22 + Math.min(40, token.length * 3) : 0;
+        window.setTimeout(tick, pause);
+      };
+      tick();
+    }, thinkMs);
   }
 
   function paintChips(): void {
@@ -348,7 +427,9 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
 
     const shots = contextualScreens(task!.screens, contextApp);
     if (shots.length) {
-      card.querySelector<HTMLElement>('.ctx-body')!.append(screenPreview(shots));
+      card.querySelector<HTMLElement>('.ctx-body')!.append(
+        screenPreview(shots, () => go({ view: 'rewind', clipId: task!.action.id })),
+      );
     }
 
     const check = card.querySelector<HTMLButtonElement>('.ctx-check')!;
@@ -370,7 +451,8 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
     | { view: 'tasks'; goalId?: string; personId?: string }
     | { view: 'goals' }
     | { view: 'people' }
-    | { view: 'rewind' };
+    | { view: 'rewind'; clipId?: string }
+    | { view: 'conversations'; conversationId?: string };
 
   let route: Route = { view: 'chat' };
 
@@ -380,6 +462,8 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
     tasks: () => go({ view: 'tasks' }),
     goals: () => go({ view: 'goals' }),
     people: () => go({ view: 'people' }),
+    rewind: (clipId) => go({ view: 'rewind', clipId }),
+    conversation: (id) => go({ view: 'conversations', conversationId: id }),
     ask: (question) => {
       go({ view: 'chat' });
       addUser(question);
@@ -418,7 +502,10 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
       viewHost.replaceChildren(renderGoals(workspace, nav));
     } else if (next.view === 'rewind') {
       titleEl.textContent = 'Rewind';
-      viewHost.replaceChildren(renderRewind(workspace, nav));
+      viewHost.replaceChildren(renderRewind(workspace, nav, { focusClipId: next.clipId }));
+    } else if (next.view === 'conversations') {
+      titleEl.textContent = 'Conversations';
+      viewHost.replaceChildren(renderConversations(workspace, nav, { focusId: next.conversationId }));
     } else {
       titleEl.textContent = 'People';
       viewHost.replaceChildren(renderPeople(workspace, nav));
@@ -433,6 +520,7 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
       else if (target === 'goals') go({ view: 'goals' });
       else if (target === 'people') go({ view: 'people' });
       else if (target === 'rewind') go({ view: 'rewind' });
+      else if (target === 'conversations') go({ view: 'conversations' });
       else go({ view: 'chat' });
     });
   }
@@ -565,6 +653,7 @@ export function openOmiApp(host: HTMLElement, options: OmiAppOptions): OmiChat {
           text: `You are about to talk to ${firstName(focus.person)}, and there is one thing outstanding${task?.dueLabel ? ` — ${task.dueLabel.toLowerCase()}` : ''}.`,
           quote: line ? `${line.speaker}: ${line.text}` : undefined,
           cite: task?.source?.title,
+          conversationId: task?.source?.id,
         },
     false,
   );

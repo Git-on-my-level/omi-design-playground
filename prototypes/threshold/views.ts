@@ -15,7 +15,17 @@
  * list you did not type.
  */
 import type { Memory, MemoryKind } from '../../reference/hackathon-pack/src/types';
-import { firstName, initials, relativeDays, type GoalView, type PersonView, type ScreenCapture, type TaskView, type Workspace } from './workspace';
+import {
+  firstName,
+  initials,
+  relativeDays,
+  type GoalView,
+  type PersonView,
+  type RewindClip,
+  type ScreenCapture,
+  type TaskView,
+  type Workspace,
+} from './workspace';
 
 export interface Nav {
   /** Tasks, lensed on one person. */
@@ -25,6 +35,10 @@ export interface Nav {
   tasks(): void;
   goals(): void;
   people(): void;
+  /** Rewind, optionally scrolled to one clip. */
+  rewind(clipId?: string): void;
+  /** Conversations, optionally opened on one transcript. */
+  conversation(id?: string): void;
   ask(question: string): void;
 }
 
@@ -78,63 +92,179 @@ const STATE_LABEL: Record<ScreenCapture['state'], string> = {
   done: 'Done',
 };
 
-/** Paint detail lines when present; otherwise a suggestive wireframe for the app. */
-function shotWire(screen: ScreenCapture): string {
-  if (screen.detail?.length) {
-    const kind = screen.app === 'Slack' ? 'slack' : screen.app === 'Mail' ? 'mail' : screen.app === 'Meet' ? 'meet' : 'doc';
-    return `<div class="wire wire-detail wire-${kind}">${screen.detail
-      .map((line, i) => {
-        const last = i === screen.detail!.length - 1 && screen.state === 'done';
-        return `<span class="wd${last ? ' is-answer' : ''}">${line}</span>`;
-      })
-      .join('')}</div>`;
-  }
-  if (screen.app === 'Meet') {
-    return '<div class="wire wire-meet"><span></span><span></span><span></span><span></span></div>';
-  }
-  if (screen.app === 'Slack') {
-    return '<div class="wire wire-slack"><span class="wt">Threads</span><span class="wl"></span><span class="wl short"></span><span class="wl"></span></div>';
-  }
+const APP_SLUG: Record<string, string> = {
+  Mail: 'mail',
+  Slack: 'slack',
+  Meet: 'meet',
+  Calendar: 'cal',
+  Browser: 'web',
+  Figma: 'figma',
+  Pages: 'doc',
+  'Code review': 'code',
+};
+
+/** Initials from a name, or the part after a "To:/From:" label. */
+function whoInitials(line = ''): string {
+  const name = line.replace(/^(to|from|dm)\s*[:·]?\s*/i, '').replace(/\s*·.*$/, '').trim();
+  return initials(name || line);
+}
+
+/** Split "Name: text" into the two halves; null when there is no speaker. */
+function speakerLine(line: string): { who: string; text: string } | null {
+  const match = line.match(/^([^:]{1,22}):\s*(.+)$/);
+  return match ? { who: match[1]!.trim(), text: match[2]!.trim() } : null;
+}
+
+/*
+ * Each capture is drawn as a small, recognisable stand-in for the app it was seen
+ * in — a mail message, a Slack thread, a Meet stage — rather than a stack of
+ * text lines. Still synthetic and labelled "seen on screen"; the point is that it
+ * *reads* as a screenshot of that app, not a transcript of it.
+ */
+function mockScreen(screen: ScreenCapture): string {
+  const d = screen.detail ?? [];
+  const line = (i: number): string => d[i] ?? '';
+
   if (screen.app === 'Mail') {
-    return '<div class="wire wire-mail"><span class="wl short"></span><span class="wl"></span><span class="wl"></span><span class="wl short"></span></div>';
+    const sent = d.some((l) => /^sent$/i.test(l));
+    const body = d.slice(2).filter((l) => !/^sent$/i.test(l));
+    return `
+      <div class="mk mk-mail">
+        <div class="mk-mail-head">
+          <span class="mk-ava">${whoInitials(line(0))}</span>
+          <span class="mk-mail-meta"><b>${line(0)}</b><i>${line(1)}</i></span>
+        </div>
+        <div class="mk-mail-body">${body.map((l) => `<span>${l}</span>`).join('')}</div>
+        ${sent ? '<span class="mk-mail-sent">Sent</span>' : ''}
+      </div>`;
   }
+
+  if (screen.app === 'Slack') {
+    const rows = d
+      .slice(1)
+      .map((l) => {
+        const s = speakerLine(l);
+        return s
+          ? `<div class="mk-msg"><span class="mk-msg-ava"></span><span><b>${s.who}</b> ${s.text}</span></div>`
+          : `<div class="mk-sub">${l}</div>`;
+      })
+      .join('');
+    return `
+      <div class="mk mk-slack">
+        <div class="mk-slack-rail"><i></i><i></i><i></i><i></i></div>
+        <div class="mk-slack-main"><div class="mk-slack-head">${line(0)}</div>${rows}</div>
+      </div>`;
+  }
+
+  if (screen.app === 'Meet') {
+    // Last speaker line is the real name; "Agreed: …" earlier is a label, not a person.
+    const caption = [...d.slice(1)].reverse().find((l) => speakerLine(l)) ?? line(1);
+    const intro = d.find((l) => /is in the call|joined|joining/i.test(l));
+    const who = intro?.replace(/\s+(is in the call|joined|joining).*$/i, '').trim()
+      ?? speakerLine(caption)?.who
+      ?? line(1);
+    return `
+      <div class="mk mk-meet">
+        <div class="mk-meet-stage"><span class="mk-tile">${whoInitials(who)}</span><span class="mk-tile mk-tile-you">You</span></div>
+        <div class="mk-meet-foot"><span class="mk-meet-title">${line(0)}</span><span class="mk-dot"></span><span class="mk-dot"></span></div>
+        ${caption ? `<div class="mk-meet-cap">${caption}</div>` : ''}
+      </div>`;
+  }
+
+  if (screen.app === 'Calendar') {
+    return `
+      <div class="mk mk-cal">
+        <div class="mk-cal-day">${line(0)}</div>
+        <div class="mk-cal-grid">${d.slice(1).map((e, i) => `<div class="mk-evt mk-evt-${i % 2}">${e}</div>`).join('')}</div>
+      </div>`;
+  }
+
+  if (screen.app === 'Browser') {
+    return `
+      <div class="mk mk-web">
+        <div class="mk-web-bar"><i></i><i></i><span class="mk-web-url">${line(0)}</span></div>
+        <div class="mk-web-body">${d.slice(1).map((l) => `<span>${l}</span>`).join('')}</div>
+      </div>`;
+  }
+
+  if (screen.app === 'Figma') {
+    return `
+      <div class="mk mk-figma">
+        <div class="mk-fig-rail"><i></i><i></i><i></i></div>
+        <div class="mk-fig-canvas"><span class="mk-fig-frame">${line(0)}</span>${d.slice(1).map((l) => `<span class="mk-fig-note">${l}</span>`).join('')}</div>
+      </div>`;
+  }
+
   if (screen.app === 'Code review') {
-    return '<div class="wire wire-code"><span class="wl"></span><span class="wl short"></span><span class="wl"></span><span class="wl short"></span></div>';
+    return `<div class="mk mk-code">${d.map((l, i) => `<span class="mk-code-l mk-code-${i % 3 === 2 ? 'add' : 'ctx'}">${l}</span>`).join('')}</div>`;
   }
-  return '<div class="wire wire-doc"><span class="wl"></span><span class="wl"></span><span class="wl short"></span></div>';
+
+  // Pages and any document-like app.
+  return `
+    <div class="mk mk-doc">
+      <div class="mk-doc-title">${line(0)}</div>
+      ${d.slice(1).map((l) => `<span class="mk-doc-l">${l}</span>`).join('')}
+    </div>`;
 }
 
 function shotThumb(screen: ScreenCapture): string {
+  const slug = APP_SLUG[screen.app] ?? 'doc';
   return `
     <figure class="shot shot-${screen.state}">
-      <div class="shot-frame">
+      <div class="shot-frame shot-app-${slug}">
         <div class="shot-bar"><i></i><i></i><i></i><span>${screen.app}</span></div>
-        <div class="shot-body">${shotWire(screen)}</div>
+        <div class="shot-body">${mockScreen(screen)}</div>
       </div>
       <figcaption class="shot-cap">${screen.caption}</figcaption>
       <p class="shot-meta"><span class="shot-state">${STATE_LABEL[screen.state]}</span>${screen.at}</p>
     </figure>`;
 }
 
-export function screenStrip(screens: ScreenCapture[]): HTMLElement {
+export function screenStrip(
+  screens: ScreenCapture[],
+  options: { onShot?: () => void; label?: string } = {},
+): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'screens';
   wrap.innerHTML = `
-    <p class="screens-label">Seen on screen</p>
-    <div class="screens-row">${screens.map(shotThumb).join('')}</div>
+    <p class="screens-label">${options.label ?? 'Seen on screen'}</p>
+    <div class="screens-row"></div>
   `;
+  const row = wrap.querySelector<HTMLElement>('.screens-row')!;
+  for (const screen of screens) {
+    const fig = document.createElement('div');
+    fig.innerHTML = shotThumb(screen);
+    const shot = fig.firstElementChild as HTMLElement;
+    if (options.onShot) {
+      shot.classList.add('is-link');
+      shot.setAttribute('role', 'button');
+      shot.tabIndex = 0;
+      const go = (event: Event): void => {
+        event.stopPropagation();
+        options.onShot!();
+      };
+      shot.addEventListener('click', go);
+      shot.addEventListener('keydown', (event: KeyboardEvent) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          go(event);
+        }
+      });
+    }
+    row.append(shot);
+  }
   return wrap;
 }
 
 /**
- * A tiny stand-in that rides in a task row's tail without adding height. Click it
- * to see the full captures. The count hints there is more than one behind it.
+ * A tiny stand-in that rides in a task row's tail without adding height. Click
+ * opens Rewind on that trail. The count hints there is more than one behind it.
  */
-export function screenPreview(screens: ScreenCapture[]): HTMLElement {
+export function screenPreview(screens: ScreenCapture[], onOpen: () => void): HTMLElement {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'shot-mini';
-  btn.title = 'Seen on screen';
+  btn.title = 'Open in Rewind';
   btn.innerHTML = `
     <span class="shot-mini-frame">
       <span class="shot-mini-bar"></span>
@@ -144,36 +274,9 @@ export function screenPreview(screens: ScreenCapture[]): HTMLElement {
   `;
   btn.addEventListener('click', (event) => {
     event.stopPropagation();
-    openLightbox(screens);
+    onOpen();
   });
   return btn;
-}
-
-/** The captures, full size, over a dim backdrop. Click away or Esc to close. */
-export function openLightbox(screens: ScreenCapture[]): void {
-  const overlay = document.createElement('div');
-  overlay.className = 'shots-lightbox';
-  const panel = document.createElement('div');
-  panel.className = 'shots-panel';
-  panel.append(screenStrip(screens));
-  overlay.append(panel);
-
-  const close = (): void => {
-    overlay.classList.add('is-closing');
-    window.setTimeout(() => overlay.remove(), 180);
-    document.removeEventListener('keydown', onKey);
-  };
-  const onKey = (event: KeyboardEvent): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      close();
-    }
-  };
-  overlay.addEventListener('click', (event) => {
-    if (event.target === overlay) close();
-  });
-  document.addEventListener('keydown', onKey);
-  document.body.append(overlay);
 }
 
 /* ---------------------------------------------------------------------- *
@@ -207,7 +310,9 @@ export function taskRow(task: TaskView, workspace: Workspace, nav: Nav, options:
 
   const tail = wrap.querySelector<HTMLElement>('.task-tail')!;
   // A tiny preview, not a strip: it rides in the tail without growing the row.
-  if (task.screens?.length) tail.append(screenPreview(task.screens));
+  if (task.screens?.length) {
+    tail.append(screenPreview(task.screens, () => nav.rewind(task.action.id)));
+  }
   if (options.showGoal) tail.append(goalChip(task.goal, nav));
   if (options.showPerson && task.person) {
     const view = workspace.personById.get(task.person.id);
@@ -232,6 +337,15 @@ export function taskRow(task: TaskView, workspace: Workspace, nav: Nav, options:
         .map((s) => `<p class="receipt-l"><span>${s.speaker}:</span> ${s.text}</p>`)
         .join('')}
     `;
+    const link = document.createElement('button');
+    link.type = 'button';
+    link.className = 'receipt-link';
+    link.textContent = 'View conversation';
+    link.addEventListener('click', (event) => {
+      event.stopPropagation();
+      nav.conversation(task.source!.id);
+    });
+    slot.append(link);
     wrap.querySelector<HTMLElement>('.task-row')!.addEventListener('click', () => {
       const open = wrap.classList.toggle('is-open');
       slot.style.height = open ? `${slot.scrollHeight}px` : '0px';
@@ -633,50 +747,192 @@ export function renderPeople(workspace: Workspace, nav: Nav): HTMLElement {
 /* ---------------------------------------------------------------------- *
  * Rewind
  *
- * One place to see every screen Omi says it saw, per task, newest first. It is
- * still not a feed of "what Omi saw" out in the card — it lives behind the
- * handoff door, where browsing is allowed. Synthetic; the captures are drawn,
- * not real screenshots, and labelled as much.
+ * Every screen trail — tied to a task or floating outside one — in one
+ * searchable place. Synthetic; the captures are drawn, not real screenshots.
  * ---------------------------------------------------------------------- */
 
-export function renderRewind(workspace: Workspace, nav: Nav): HTMLElement {
+function clipMatches(clip: RewindClip, query: string): boolean {
+  if (!query) return true;
+  const hay = [
+    clip.title,
+    clip.meta,
+    ...clip.screens.flatMap((screen) => [screen.app, screen.caption, ...(screen.detail ?? [])]),
+  ]
+    .join(' ')
+    .toLowerCase();
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((word) => hay.includes(word));
+}
+
+export function renderRewind(
+  workspace: Workspace,
+  nav: Nav,
+  options: { focusClipId?: string } = {},
+): HTMLElement {
   const page = document.createElement('div');
   page.className = 'view';
 
-  const clips = workspace.tasks.filter((task) => task.screens?.length);
-  const shots = clips.reduce((n, task) => n + (task.screens?.length ?? 0), 0);
+  const all = workspace.rewinds;
+  const totalShots = all.reduce((n, clip) => n + clip.screens.length, 0);
+  const loose = all.filter((clip) => !clip.taskId).length;
 
   page.innerHTML = `
     <header class="lens">
       <h1 class="lens-title">Rewind</h1>
-      <p class="lens-sub">${shots} screens across ${clips.length} tasks, seen while your work moved.</p>
+      <p class="lens-sub">${totalShots} screens · ${all.length - loose} tasks · ${loose} outside tasks</p>
+      <form class="rw-search" data-search>
+        <input class="rw-search-input" type="search" placeholder="Search screens, apps, people…" data-q autocomplete="off" />
+      </form>
     </header>
     <div class="rewind" data-rewind></div>
   `;
 
   const host = page.querySelector<HTMLElement>('[data-rewind]')!;
-  if (clips.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'empty';
-    empty.textContent = 'Nothing on screen yet.';
-    host.append(empty);
-    return page;
+  const input = page.querySelector<HTMLInputElement>('[data-q]')!;
+  const form = page.querySelector<HTMLFormElement>('[data-search]')!;
+  form.addEventListener('submit', (event) => event.preventDefault());
+
+  function paint(query: string): void {
+    host.replaceChildren();
+    const clips = all.filter((clip) => clipMatches(clip, query));
+    if (clips.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'empty';
+      empty.textContent = query ? 'Nothing matches.' : 'Nothing on screen yet.';
+      host.append(empty);
+      return;
+    }
+
+    for (const clip of clips) {
+      const section = document.createElement('section');
+      section.className = 'rw';
+      section.dataset.clip = clip.id;
+      if (clip.id === options.focusClipId) section.classList.add('is-focus');
+      section.innerHTML = `
+        <header class="rw-head">
+          <button class="rw-title" type="button"></button>
+          <span class="rw-meta">${clip.meta}${clip.taskId ? '' : ' · outside tasks'}</span>
+        </header>
+      `;
+      const title = section.querySelector<HTMLButtonElement>('.rw-title')!;
+      title.textContent = clip.title;
+      title.addEventListener('click', () => {
+        if (clip.taskId) {
+          const task = workspace.taskById.get(clip.taskId);
+          if (task) nav.goal(task.goal.id);
+        }
+      });
+      section.append(screenStrip(clip.screens));
+      host.append(section);
+    }
+
+    if (options.focusClipId) {
+      const focused = host.querySelector<HTMLElement>(`[data-clip="${options.focusClipId}"]`);
+      focused?.scrollIntoView({ block: 'nearest' });
+    }
   }
 
-  for (const task of clips) {
-    const clip = document.createElement('section');
-    clip.className = 'rw';
-    clip.innerHTML = `
-      <header class="rw-head">
-        <button class="rw-title" type="button"></button>
-        <span class="rw-meta">${[task.person && firstName(task.person), task.goal.title].filter(Boolean).join(' · ')}</span>
-      </header>
+  input.addEventListener('input', () => paint(input.value.trim()));
+  paint('');
+  // Land in the search box unless we were sent here for a specific clip.
+  if (!options.focusClipId) {
+    window.setTimeout(() => input.focus({ preventScroll: true }), 80);
+  }
+  return page;
+}
+
+/* ---------------------------------------------------------------------- *
+ * Conversations
+ *
+ * The source material behind every receipt, as its own page. A receipt shows
+ * one line; this is where you read the whole exchange it came from. Real fixture
+ * transcripts — the one thing here that is not fabricated.
+ * ---------------------------------------------------------------------- */
+
+const SOURCE_LABEL: Record<string, string> = {
+  macos: 'Mac',
+  ios: 'iPhone',
+  device: 'Omi device',
+};
+
+export function renderConversations(
+  workspace: Workspace,
+  nav: Nav,
+  options: { focusId?: string } = {},
+): HTMLElement {
+  const page = document.createElement('div');
+  page.className = 'view';
+
+  const all = workspace.conversations;
+  page.innerHTML = `
+    <header class="lens">
+      <h1 class="lens-title">Conversations</h1>
+      <p class="lens-sub">${all.length} recorded · the transcripts your commitments came out of</p>
+    </header>
+    <div class="convos" data-convos></div>
+  `;
+
+  const host = page.querySelector<HTMLElement>('[data-convos]')!;
+  for (const convo of all) {
+    const people = convo.people
+      .map((id) => workspace.personById.get(id))
+      .filter((view): view is PersonView => Boolean(view));
+    const tail = [SOURCE_LABEL[convo.source] ?? convo.source, relativeDays(convo.startedAt)].join(' · ');
+
+    const row = document.createElement('section');
+    row.className = 'convo';
+    row.dataset.convo = convo.id;
+    row.innerHTML = `
+      <button class="convo-head" type="button">
+        <span class="convo-main">
+          <span class="convo-title">${convo.title}</span>
+          <span class="convo-meta" data-meta></span>
+          <span class="convo-sum">${convo.summary}</span>
+        </span>
+        <span class="convo-count">${convo.segments.length} lines</span>
+      </button>
+      <div class="convo-body" data-body></div>
     `;
-    const title = clip.querySelector<HTMLButtonElement>('.rw-title')!;
-    title.textContent = task.action.title;
-    title.addEventListener('click', () => nav.goal(task.goal.id));
-    clip.append(screenStrip(task.screens!));
-    host.append(clip);
+
+    /* People names are links into their lens; the rest of the meta is plain. */
+    const metaEl = row.querySelector<HTMLElement>('[data-meta]')!;
+    people.forEach((view, i) => {
+      const link = document.createElement('button');
+      link.type = 'button';
+      link.className = 'convo-person';
+      link.textContent = firstName(view.person);
+      link.addEventListener('click', (event) => {
+        event.stopPropagation();
+        nav.person(view.person.id);
+      });
+      if (i > 0) metaEl.append(document.createTextNode(', '));
+      metaEl.append(link);
+    });
+    metaEl.append(document.createTextNode(`${people.length ? ' · ' : ''}${tail}`));
+
+    const body = row.querySelector<HTMLElement>('[data-body]')!;
+    body.innerHTML = convo.segments
+      .map((s) => `<p class="convo-l"><span>${s.speaker}</span>${s.text}</p>`)
+      .join('');
+
+    const open = (): void => {
+      const isOpen = row.classList.toggle('is-open');
+      body.style.height = isOpen ? `${body.scrollHeight}px` : '0px';
+    };
+    row.querySelector<HTMLButtonElement>('.convo-head')!.addEventListener('click', open);
+
+    if (convo.id === options.focusId) {
+      row.classList.add('is-focus', 'is-open');
+      window.setTimeout(() => {
+        body.style.height = `${body.scrollHeight}px`;
+        row.scrollIntoView({ block: 'start' });
+      }, 40);
+    }
+
+    host.append(row);
   }
 
   return page;

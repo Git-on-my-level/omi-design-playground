@@ -115,6 +115,20 @@ const SCREEN_CAPTURES: Record<string, ScreenCapture[]> = {
     },
     {
       app: 'Mail',
+      caption: 'Attached the workshop notes',
+      at: '3:40 PM',
+      state: 'progress',
+      detail: ['To: Priya Shah', 'Subject: Workshop decision trail', '1 attachment · workshop-notes.pdf', 'Still drafting the ask…'],
+    },
+    {
+      app: 'Mail',
+      caption: 'Revised the ask with Avery',
+      at: '4:18 PM',
+      state: 'progress',
+      detail: ['To: Priya Shah', 'Subject: Workshop decision trail', 'Avery: keep the next test this week.', 'Updating the closing line…'],
+    },
+    {
+      app: 'Mail',
       caption: 'Sent: workshop decision trail',
       at: '5:06 PM',
       state: 'done',
@@ -137,6 +151,13 @@ const SCREEN_CAPTURES: Record<string, ScreenCapture[]> = {
     },
     {
       app: 'Meet',
+      caption: 'Walked the export shape',
+      at: '4:44 PM',
+      state: 'progress',
+      detail: ['Export pilot review', 'Screen share · export schema', 'Taylor: dependency is one shape.'],
+    },
+    {
+      app: 'Meet',
       caption: 'Confirmed the narrow pilot',
       at: '5:02 PM',
       state: 'done',
@@ -153,13 +174,20 @@ const SCREEN_CAPTURES: Record<string, ScreenCapture[]> = {
     },
     {
       app: 'Mail',
+      caption: 'Trimmed the out-of-scope list',
+      at: '11:05 AM',
+      state: 'progress',
+      detail: ['To: Avery Chen', 'Subject: Smallest useful slice', 'What it does not solve', 'Three bullets, then send.'],
+    },
+    {
+      app: 'Mail',
       caption: 'Sent the outline to Avery',
       at: '11:58 AM',
       state: 'done',
       detail: ['To: Avery Chen', 'Subject: Smallest useful slice', 'Sent', 'One deliberately small slice; what it does not solve is listed.'],
     },
   ],
-  // Morgan · Slack DM (and a sibling thread in the same workspace).
+  // Morgan · Slack DM (and sibling threads in the same workspace).
   'action-006': [
     {
       app: 'Slack',
@@ -171,6 +199,30 @@ const SCREEN_CAPTURES: Record<string, ScreenCapture[]> = {
         '# research-triage · pattern notes',
         'Morgan Ellis · DM',
         'Morgan: Did the workaround pattern hold up?',
+      ],
+    },
+    {
+      app: 'Slack',
+      caption: '# research-triage · pattern notes',
+      at: '4:55 PM',
+      state: 'progress',
+      detail: [
+        '# research-triage',
+        'Thread · workaround pattern',
+        'You: linking the three adjacent notes',
+        'Morgan: yes — those are the signal',
+      ],
+    },
+    {
+      app: 'Slack',
+      caption: '# export-pilot · side thread',
+      at: '5:02 PM',
+      state: 'progress',
+      detail: [
+        '# export-pilot',
+        'Thread · review path',
+        'Taylor: instrument before building bigger',
+        'You: parking this until Morgan’s DM closes',
       ],
     },
     {
@@ -200,6 +252,18 @@ const SCREEN_CAPTURES: Record<string, ScreenCapture[]> = {
     },
     {
       app: 'Mail',
+      caption: 'Drafting the invite',
+      at: '3:48 PM',
+      state: 'progress',
+      detail: [
+        'To: Quinn Ellis',
+        'Subject: Invite: practice-sharing call',
+        'Agenda: phrase + owner',
+        'Still choosing a time…',
+      ],
+    },
+    {
+      app: 'Mail',
       caption: 'Invite sent to Quinn',
       at: '4:05 PM',
       state: 'done',
@@ -221,13 +285,103 @@ const SCREEN_CAPTURES: Record<string, ScreenCapture[]> = {
     },
     {
       app: 'Figma',
+      caption: 'Added expand affordance',
+      at: '1:58 PM',
+      state: 'progress',
+      detail: ['Thread-first', 'Expand · one level', 'Calm first view'],
+    },
+    {
+      app: 'Figma',
       caption: 'Progressive map reveal',
       at: '2:15 PM',
       state: 'progress',
-      detail: ['Thread-first', 'Reveal on expand'],
+      detail: ['Thread-first', 'Reveal on expand', 'Shared with Avery'],
+    },
+  ],
+  'action-007': [
+    {
+      app: 'Browser',
+      caption: 'Evidence links for roadmap',
+      at: '9:12 AM',
+      state: 'opened',
+      detail: ['research-trail', '3 links open', 'Workshop → triage → roadmap'],
+    },
+    {
+      app: 'Browser',
+      caption: 'Pinned the strongest three',
+      at: '9:40 AM',
+      state: 'done',
+      detail: ['research-trail', 'Pinned · 3 observations', 'Ready for roadmap meeting'],
+    },
+  ],
+  'action-016': [
+    {
+      app: 'Pages',
+      caption: 'What the pilot does not solve',
+      at: '1:05 PM',
+      state: 'opened',
+      detail: ['Pilot limits', 'Drafting the deliberate no’s'],
+    },
+    {
+      app: 'Pages',
+      caption: 'Four limits written down',
+      at: '1:42 PM',
+      state: 'done',
+      detail: ['Pilot limits', '4 items', 'Shared into the decision trail'],
     },
   ],
 };
+
+export interface RewindClip {
+  id: string;
+  title: string;
+  meta: string;
+  screens: ScreenCapture[];
+  /** Present when this clip belongs to a task; absent for ambient trails. */
+  taskId?: string;
+}
+
+/**
+ * Screen trails with no task — browsing, docs, ambient work Omi still saw.
+ * They only appear in Rewind, never on a task row.
+ */
+const LOOSE_REWINDS: RewindClip[] = [
+  {
+    id: 'loose-docs',
+    title: 'Export API notes',
+    meta: 'Browser · earlier today',
+    screens: [
+      {
+        app: 'Browser',
+        caption: 'docs / export-shape',
+        at: '11:14 AM',
+        state: 'opened',
+        detail: ['export-shape.md', 'Single schema', 'No batch path yet'],
+      },
+      {
+        app: 'Browser',
+        caption: 'Highlighted the seam',
+        at: '11:22 AM',
+        state: 'done',
+        detail: ['export-shape.md', 'Seam · review path', 'Copied into Meet notes'],
+      },
+    ],
+  },
+  {
+    id: 'loose-calendar',
+    title: 'Week glance before syncs',
+    meta: 'Calendar · this morning',
+    screens: [
+      {
+        app: 'Calendar',
+        caption: 'Tue · Priya sync + pilot review',
+        at: '8:06 AM',
+        state: 'opened',
+        detail: ['Tuesday', 'Sync with Priya · 2:20', 'Export pilot review · 4:30'],
+      },
+    ],
+  },
+];
 
 export interface TaskView {
   action: SuggestedAction;
@@ -268,6 +422,11 @@ export interface Workspace {
   people: PersonView[];
   personById: Map<string, PersonView>;
   taskById: Map<string, TaskView>;
+  /** Task trails plus ambient captures that never sat on a task. */
+  rewinds: RewindClip[];
+  /** Every source conversation, newest first — the material behind the receipts. */
+  conversations: Conversation[];
+  conversationById: Map<string, Conversation>;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -397,6 +556,23 @@ export function buildWorkspace(snapshot: OmiSnapshot): Workspace {
     return bOpen - aOpen || b.person.lastSeenAt.localeCompare(a.person.lastSeenAt);
   });
 
+  const rewinds: RewindClip[] = [
+    ...tasks
+      .filter((task) => task.screens?.length)
+      .map((task) => ({
+        id: task.action.id,
+        title: task.action.title,
+        meta: [task.person && firstName(task.person), task.goal.title].filter(Boolean).join(' · '),
+        screens: task.screens!,
+        taskId: task.action.id,
+      })),
+    ...LOOSE_REWINDS,
+  ];
+
+  const conversations = [...snapshot.conversations].sort((a, b) =>
+    b.startedAt.localeCompare(a.startedAt),
+  );
+
   return {
     me: snapshot.me,
     goals,
@@ -404,5 +580,8 @@ export function buildWorkspace(snapshot: OmiSnapshot): Workspace {
     people,
     personById: new Map(people.map((view) => [view.person.id, view])),
     taskById,
+    rewinds,
+    conversations,
+    conversationById,
   };
 }

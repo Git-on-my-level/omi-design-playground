@@ -1028,6 +1028,11 @@ body {
   color: rgba(138, 128, 121, 0.75);
 }
 
+.msg-quote.is-arriving,
+.msg-cite.is-arriving {
+  animation: liftIn 280ms var(--settle) both;
+}
+
 /* Thinking: three dots, no spinner, no "omi is typing" caption. */
 .dots {
   display: inline-flex;
@@ -1615,12 +1620,32 @@ body {
 
 .screens-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 239, 230, 0.16) transparent;
+}
+
+.shot.is-link {
+  cursor: pointer;
+  border-radius: 8px;
+  transition: transform 140ms ease-out, opacity 140ms ease-out;
+}
+
+.shot.is-link:hover {
+  transform: translateY(-2px);
+  opacity: 0.92;
+}
+
+.shot.is-link:focus-visible {
+  outline: 1px solid rgba(232, 116, 59, 0.55);
+  outline-offset: 3px;
 }
 
 .shot {
-  width: 138px;
+  width: 172px;
   margin: 0;
 }
 
@@ -1656,85 +1681,424 @@ body {
 }
 
 .shot-body {
-  height: 72px;
-  padding: 8px 9px;
+  position: relative;
+  height: 96px;
+  padding: 0;
+  overflow: hidden;
 }
 
-/* Wireframe stand-ins for whatever was on screen. Suggestive, not literal. */
-.wire {
-  display: grid;
-  gap: 5px;
+/* ---- app mockups: each reads as a screenshot of its app, not a text list --- */
+
+.mk {
   height: 100%;
-  align-content: start;
-}
-
-.wire .wl {
-  height: 5px;
-  border-radius: 3px;
-  background: rgba(245, 239, 230, 0.16);
-}
-
-.wire .wl.short {
-  width: 60%;
-}
-
-.wire-meet {
-  grid-template-columns: 1fr 1fr;
-  gap: 5px;
-}
-
-.wire-meet span {
-  border-radius: 4px;
-  background: rgba(245, 239, 230, 0.12);
-}
-
-.wire-code .wl {
-  background: rgba(232, 116, 59, 0.24);
-}
-
-.wire-slack .wt {
   font-size: 8px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(245, 239, 230, 0.45);
+  line-height: 1.3;
+  color: rgba(245, 239, 230, 0.62);
 }
 
-/* Real detail lines — subject, threads, the submitted answer. */
-.wire-detail {
-  gap: 3px;
+.mk b {
+  font-weight: 600;
+  color: rgba(245, 239, 230, 0.82);
 }
 
-.wire-detail .wd {
-  display: block;
+.mk-ava,
+.mk-msg-ava,
+.mk-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: 5px;
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(245, 239, 230, 0.9);
+  background: linear-gradient(150deg, #e8743b, #b8532a);
+}
+
+/* Mail */
+.mk-mail {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #17140f;
+}
+
+.mk-mail-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border-bottom: 1px solid rgba(245, 239, 230, 0.08);
+  background: rgba(245, 239, 230, 0.03);
+}
+
+.mk-ava {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+
+.mk-mail-meta {
+  display: grid;
+  min-width: 0;
+}
+
+.mk-mail-meta b,
+.mk-mail-meta i {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 8.5px;
-  line-height: 1.25;
-  color: rgba(245, 239, 230, 0.55);
 }
 
-.wire-detail .wd:first-child {
-  color: rgba(245, 239, 230, 0.72);
-  font-weight: 500;
+.mk-mail-meta i {
+  font-style: normal;
+  font-size: 7.5px;
+  color: rgba(245, 239, 230, 0.5);
 }
 
-.wire-detail .wd.is-answer {
-  color: rgba(232, 116, 59, 0.95);
-  white-space: normal;
+.mk-mail-body {
+  display: grid;
+  gap: 3px;
+  padding: 7px 8px;
+  align-content: start;
+}
+
+.mk-mail-body span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mk-mail-sent {
+  margin: auto 8px 7px;
+  align-self: flex-start;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #8fe0a0;
+  background: rgba(123, 201, 138, 0.16);
+}
+
+/* Slack */
+.mk-slack {
+  display: flex;
+  height: 100%;
+  background: #1a1622;
+}
+
+.mk-slack-rail {
+  flex: none;
+  width: 16px;
+  display: grid;
+  gap: 5px;
+  padding: 7px 0;
+  justify-items: center;
+  background: #241d30;
+}
+
+.mk-slack-rail i {
+  width: 9px;
+  height: 9px;
+  border-radius: 4px;
+  background: rgba(245, 239, 230, 0.16);
+}
+
+.mk-slack-rail i:first-child {
+  background: #e8743b;
+}
+
+.mk-slack-main {
+  min-width: 0;
+  flex: 1;
+  padding: 6px 8px;
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.mk-slack-head {
+  font-weight: 600;
+  color: rgba(245, 239, 230, 0.82);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mk-msg {
+  display: flex;
+  gap: 5px;
+}
+
+.mk-msg-ava {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.mk-msg span:last-child {
+  min-width: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.wire-slack .wd:nth-child(2) {
-  color: rgba(245, 239, 230, 0.38);
+.mk-sub {
+  color: rgba(245, 239, 230, 0.4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.wire-mail .wd:nth-child(3) {
-  margin-top: 2px;
-  padding-top: 3px;
-  border-top: 1px solid rgba(245, 239, 230, 0.08);
+/* Meet */
+.mk-meet {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #101012;
+}
+
+.mk-meet-stage {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 6px;
+}
+
+.mk-tile {
+  border-radius: 6px;
+  background: linear-gradient(160deg, #2a3550, #1b2236);
+  font-size: 9px;
+}
+
+.mk-tile-you {
+  background: linear-gradient(160deg, #3a2a20, #241812);
+}
+
+.mk-meet-foot {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mk-meet-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(245, 239, 230, 0.75);
+}
+
+.mk-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(245, 239, 230, 0.18);
+}
+
+.mk-dot:last-child {
+  background: rgba(232, 116, 59, 0.85);
+}
+
+.mk-meet-cap {
+  padding: 4px 8px 6px;
+  color: rgba(245, 239, 230, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Calendar */
+.mk-cal {
+  height: 100%;
+  background: #16130f;
+}
+
+.mk-cal-day {
+  padding: 5px 8px;
+  font-weight: 600;
+  color: rgba(245, 239, 230, 0.78);
+  border-bottom: 1px solid rgba(245, 239, 230, 0.08);
+}
+
+.mk-cal-grid {
+  display: grid;
+  gap: 4px;
+  padding: 7px 8px;
+}
+
+.mk-evt {
+  padding: 4px 6px;
+  border-radius: 4px;
+  border-left: 2px solid #e8743b;
+  background: rgba(232, 116, 59, 0.14);
+  color: rgba(245, 239, 230, 0.78);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mk-evt-1 {
+  border-left-color: #5aa9e6;
+  background: rgba(90, 169, 230, 0.14);
+}
+
+/* Browser */
+.mk-web {
+  height: 100%;
+  background: #14120f;
+}
+
+.mk-web-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  background: rgba(245, 239, 230, 0.05);
+  border-bottom: 1px solid rgba(245, 239, 230, 0.07);
+}
+
+.mk-web-bar i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(245, 239, 230, 0.2);
+}
+
+.mk-web-url {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(245, 239, 230, 0.08);
+  color: rgba(245, 239, 230, 0.7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mk-web-body {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  align-content: start;
+}
+
+.mk-web-body span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mk-web-body span:first-child {
+  color: rgba(245, 239, 230, 0.8);
+  font-weight: 600;
+}
+
+/* Figma */
+.mk-figma {
+  display: flex;
+  height: 100%;
+  background: #111114;
+}
+
+.mk-fig-rail {
+  flex: none;
+  width: 18px;
+  display: grid;
+  gap: 4px;
+  padding: 6px 0;
+  justify-items: center;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mk-fig-rail i {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(245, 239, 230, 0.18);
+}
+
+.mk-fig-canvas {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  justify-items: center;
+  padding: 6px;
+}
+
+.mk-fig-frame {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(90, 169, 230, 0.6);
+  background: rgba(90, 169, 230, 0.08);
+  color: rgba(245, 239, 230, 0.82);
+}
+
+.mk-fig-note {
+  color: rgba(245, 239, 230, 0.45);
+}
+
+/* Code review */
+.mk-code {
+  display: grid;
+  gap: 2px;
+  height: 100%;
+  padding: 7px 8px;
+  align-content: start;
+  font-family: 'SF Mono', ui-monospace, monospace;
+  font-size: 7.5px;
+  background: #0f120f;
+}
+
+.mk-code-l {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 8px;
+}
+
+.mk-code-ctx {
+  color: rgba(245, 239, 230, 0.5);
+}
+
+.mk-code-add {
+  color: #8fe0a0;
+  background: rgba(123, 201, 138, 0.1);
+  border-left: 2px solid #7bc98a;
+  padding-left: 6px;
+}
+
+/* Pages / docs */
+.mk-doc {
+  display: grid;
+  gap: 4px;
+  height: 100%;
+  padding: 8px 9px;
+  align-content: start;
+  background: #17140f;
+}
+
+.mk-doc-title {
+  font-weight: 600;
+  color: rgba(245, 239, 230, 0.82);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mk-doc-l {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .shot-cap {
@@ -1832,57 +2196,44 @@ body {
   color: var(--ink-dim);
 }
 
-/* ---- lightbox ---------------------------------------------------------- */
-
-.shots-lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: grid;
-  place-items: center;
-  padding: 40px;
-  background: rgba(10, 8, 7, 0.62);
-  backdrop-filter: blur(3px);
-  animation: fadeIn 160ms ease-out both;
-}
-
-.shots-lightbox.is-closing {
-  animation: fadeIn 160ms ease-out reverse both;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.shots-panel {
-  max-width: min(90vw, 640px);
-  padding: 20px;
-  border-radius: 16px;
-  background: var(--card);
-  border: 1px solid var(--edge);
-  box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.8);
-}
-
-/* In the lightbox the captures get more room than in a tail preview. */
-.shots-panel .shot {
-  width: 188px;
-}
-
-.shots-panel .shot-body {
-  height: 96px;
-}
-
 /* ---- rewind ------------------------------------------------------------ */
+
+.rw-search {
+  margin-top: 14px;
+}
+
+.rw-search-input {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  padding: 9px 12px;
+  border-radius: 9px;
+  border: 1px solid rgba(245, 239, 230, 0.12);
+  background: rgba(245, 239, 230, 0.05);
+  outline: none;
+}
+
+.rw-search-input::placeholder {
+  color: rgba(138, 128, 121, 0.8);
+}
+
+.rw-search-input:focus {
+  border-color: rgba(232, 116, 59, 0.45);
+}
 
 .rewind {
   padding: 0 24px 24px;
   display: grid;
   gap: 22px;
+}
+
+.rw.is-focus {
+  padding: 12px;
+  margin: 0 -12px;
+  border-radius: 12px;
+  background: rgba(232, 116, 59, 0.08);
+  border: 1px solid rgba(232, 116, 59, 0.22);
 }
 
 .rw-head {
@@ -1917,6 +2268,141 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-dim);
+}
+
+/* ---- conversations ----------------------------------------------------- */
+
+.convos {
+  padding: 4px 24px 24px;
+  display: grid;
+  gap: 10px;
+}
+
+.convo {
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  background: rgba(245, 239, 230, 0.02);
+  overflow: hidden;
+  transition: border-color 160ms ease-out, background 160ms ease-out;
+}
+
+.convo.is-focus {
+  border-color: rgba(232, 116, 59, 0.35);
+  background: rgba(232, 116, 59, 0.06);
+}
+
+.convo-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  padding: 13px 15px;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.convo-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.convo-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.convo-meta {
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.convo-person {
+  font: inherit;
+  font-size: 11px;
+  color: rgba(245, 239, 230, 0.7);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.convo-person:hover {
+  color: var(--ember);
+}
+
+.convo-sum {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(245, 239, 230, 0.62);
+}
+
+.convo-count {
+  flex: none;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  padding-top: 2px;
+}
+
+.convo-body {
+  height: 0;
+  overflow: hidden;
+  transition: height 260ms var(--settle);
+}
+
+.convo-l {
+  margin: 0;
+  padding: 5px 15px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(245, 239, 230, 0.72);
+  border-top: 1px solid rgba(245, 239, 230, 0.05);
+}
+
+.convo-l span {
+  color: var(--ember);
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+/* ---- the two ingress links: transcript and rewind --------------------- */
+
+.receipt-link,
+.msg-cite-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ember);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.receipt-link::after,
+.msg-cite-link::after {
+  content: '→';
+  font-size: 12px;
+}
+
+.receipt-link:hover,
+.msg-cite-link:hover {
+  text-decoration: underline;
+}
+
+.msg-cite-link {
+  margin-top: 6px;
 }
 
 /* ---- chips that cross dimensions --------------------------------------- */
