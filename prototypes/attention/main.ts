@@ -1,4 +1,4 @@
-import { OmiMock, omiScenarioCatalog, omiScenarioNames, type OmiScenarioName } from '../../reference/hackathon-pack/src';
+import { OmiMock, omiScenarioNames, type OmiScenarioName } from '../../reference/hackathon-pack/src';
 import type { Conversation, Memory } from '../../reference/hackathon-pack/src/types';
 import { rankAttention, type AttentionItem } from './rank';
 import './style.css';
@@ -10,12 +10,12 @@ const params = new URLSearchParams(window.location.search);
 const initialScenario: OmiScenarioName =
   omiScenarioNames.find((name) => name === params.get('scenario')) ?? 'power-user';
 
-let omi = new OmiMock({ scenario: initialScenario, latencyMs: 60, now: () => FIXTURE_NOW });
+const omi = new OmiMock({ scenario: initialScenario, latencyMs: 60, now: () => FIXTURE_NOW });
 let conversations: Conversation[] = [];
 let memories: Memory[] = [];
 let primary: AttentionItem | null = null;
 let queue: AttentionItem[] = [];
-let skippedIds = new Set<string>();
+const skippedIds = new Set<string>();
 
 const $ = <T extends Element>(selector: string) => {
   const node = document.querySelector<T>(selector);
@@ -39,7 +39,6 @@ const contextMemories = $<HTMLUListElement>('#context-memories');
 const queueList = $<HTMLOListElement>('#queue-list');
 const queueCount = $<HTMLElement>('#queue-count');
 const queueEmpty = $<HTMLElement>('#queue-empty');
-const scenarioSelect = $<HTMLSelectElement>('#scenario');
 
 const fmtDue = (iso?: string) => {
   if (!iso) return 'No due time';
@@ -159,7 +158,15 @@ async function refresh(): Promise<void> {
 
   const processingNote =
     snapshot.capture.status === 'processing' ? ' · capture processing' : '';
-  deviceEl.textContent = `${snapshot.device.name} · ${snapshot.device.connection} · ${snapshot.device.batteryPercent}%${processingNote}`;
+  deviceEl.dataset.connection = snapshot.device.connection;
+  deviceEl.replaceChildren();
+  const dot = document.createElement('span');
+  dot.className = 'device-dot';
+  dot.setAttribute('aria-hidden', 'true');
+  deviceEl.append(
+    dot,
+    `${snapshot.device.name} · ${snapshot.device.connection} · ${snapshot.device.batteryPercent}%${processingNote}`,
+  );
 
   const ranked = rankAttention({
     snapshot,
@@ -175,26 +182,6 @@ async function refresh(): Promise<void> {
   renderPrimary(primary);
   renderQueue(queue);
 }
-
-scenarioSelect.replaceChildren(
-  ...omiScenarioCatalog.map((scenario) => {
-    const option = document.createElement('option');
-    option.value = scenario.id;
-    option.textContent = scenario.label;
-    return option;
-  }),
-);
-scenarioSelect.value = initialScenario;
-
-scenarioSelect.addEventListener('change', () => {
-  const scenario = scenarioSelect.value as OmiScenarioName;
-  const url = new URL(window.location.href);
-  url.searchParams.set('scenario', scenario);
-  window.history.replaceState({}, '', url);
-  omi = new OmiMock({ scenario, latencyMs: 60, now: () => FIXTURE_NOW });
-  skippedIds = new Set();
-  void refresh();
-});
 
 doneButton.addEventListener('click', async () => {
   if (!primary?.actionId) return;

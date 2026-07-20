@@ -317,11 +317,16 @@ function placeMarker(): void {
   const win = windowEl(active);
   const surfaceRect = stage.surface.getBoundingClientRect();
   const winRect = win.getBoundingClientRect();
-  const markerW = marker.offsetWidth || 264;
+  // The answered state widens to 300px (style.css); offsetWidth mid-transition
+  // still reports the old width, which let the panel hang past the screen edge.
+  const markerW = marker.classList.contains('is-answered') ? 300 : marker.offsetWidth || 264;
   const inset = 16;
   // Float the overlay over the focused window's top-right, below its chrome.
   const top = Math.max(40, winRect.top - surfaceRect.top + 60);
-  const left = Math.max(8, winRect.right - surfaceRect.left - markerW - inset);
+  const left = Math.min(
+    surfaceRect.width - markerW - 8, // never overflow the surface, whatever the window rect says
+    Math.max(8, winRect.right - surfaceRect.left - markerW - inset),
+  );
   marker.style.visibility = 'visible';
   marker.style.top = `${Math.round(top)}px`;
   marker.style.left = `${Math.round(left)}px`;
@@ -456,25 +461,56 @@ function closeOmi(): void {
   syncDock();
 }
 
+let streamTimer: number | undefined;
+
+function stopStream(): void {
+  if (streamTimer !== undefined) window.clearTimeout(streamTimer);
+  streamTimer = undefined;
+}
+
+/** Thinking beat, then word-by-word reveal — the cadence of an agent, not a dump. */
+function thinkThenStream(el: HTMLElement, text: string): void {
+  stopStream();
+  el.innerHTML = '<span class="think-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
+  streamTimer = window.setTimeout(() => {
+    el.textContent = '';
+    const words = text.split(/(\s+)/).filter(Boolean);
+    let i = 0;
+    const tick = (): void => {
+      if (i >= words.length) {
+        streamTimer = undefined;
+        return;
+      }
+      el.textContent = (el.textContent ?? '') + words[i];
+      i += 1;
+      streamTimer = window.setTimeout(tick, 30);
+    };
+    tick();
+  }, 460);
+}
+
 function addExchange(question: string, answer: string): void {
   chatLog.innerHTML = `
-    <p class="chat-question">${question}</p>
-    <p class="chat-answer"><span></span>${answer}</p>
+    <p class="chat-question"></p>
+    <p class="chat-answer"><span class="chat-bar"></span><span class="chat-text"></span></p>
   `;
+  chatLog.querySelector<HTMLElement>('.chat-question')!.textContent = question;
+  thinkThenStream(chatLog.querySelector<HTMLElement>('.chat-text')!, answer);
 }
 
 /** Answer lands in the overlay; Omi only opens if the user dives deeper. */
 function showAnswer(question: string, answer: string): void {
   markerQ.textContent = question;
-  markerA.textContent = answer;
   answerPanel.hidden = false;
   marker.classList.remove('is-minimal', 'is-listening');
   marker.classList.add('is-answered');
+  thinkThenStream(markerA, answer);
   schedulePlaceMarker();
 }
 
 function dismissAnswer(): void {
   if (answerPanel.hidden) return;
+  stopStream();
   answerPanel.hidden = true;
   marker.classList.remove('is-answered');
   markerFollowup.value = '';
@@ -734,12 +770,16 @@ function selfCheck(): void {
 }
 
 window.addEventListener('resize', placeMarker);
+// Re-anchor once the answered-state width transition settles, so the wider
+// panel never hangs past the screen edge.
+marker.addEventListener('transitionend', placeMarker);
 setActive('browser');
 selfCheck();
 void omi.getSnapshot().then(hydrateFixture);
 
 import.meta.hot?.dispose(() => {
   if (wordTimer !== undefined) window.clearInterval(wordTimer);
+  stopStream();
   unbindPtt();
   voice.destroy();
   stage.destroy();

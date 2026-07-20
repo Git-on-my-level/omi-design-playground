@@ -101,7 +101,38 @@ button {
 }
 
 .device {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   margin: 0;
+}
+
+.device-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--signal);
+}
+
+.device[data-connection='connected'] .device-dot {
+  background: var(--ok);
+  animation: signal-pulse 2.6s ease-out infinite;
+}
+
+.device[data-connection='disconnected'] .device-dot {
+  background: var(--signal);
+}
+
+@keyframes signal-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(31, 92, 74, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(31, 92, 74, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(31, 92, 74, 0);
+  }
 }
 
 .stage {
@@ -322,33 +353,6 @@ button {
   color: var(--ink-soft);
 }
 
-.foot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 2.5rem;
-  color: var(--ink-soft);
-  font-size: 0.82rem;
-}
-
-.foot p {
-  margin: 0;
-}
-
-.scenario {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.scenario select {
-  padding: 0.35rem 0.5rem;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-}
-
 @keyframes enter {
   from {
     opacity: 0;
@@ -387,10 +391,5 @@ button {
   .queue .due {
     grid-column: 2;
     white-space: normal;
-  }
-
-  .foot {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }

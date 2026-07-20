@@ -1,4 +1,4 @@
-import { OmiMock, omiScenarioCatalog, omiScenarioNames, type OmiScenarioName } from '../../reference/hackathon-pack/src';
+import { OmiMock, omiScenarioNames, type OmiScenarioName } from '../../reference/hackathon-pack/src';
 import type { Conversation, Memory, OmiSnapshot, SuggestedAction } from '../../reference/hackathon-pack/src/types';
 import './style.css';
 
@@ -7,7 +7,7 @@ const requested = params.get('scenario');
 const initialScenario: OmiScenarioName =
   omiScenarioNames.find((name) => name === requested) ?? 'default';
 
-let omi = new OmiMock({ scenario: initialScenario, latencyMs: 80, processingMs: 900 });
+const omi = new OmiMock({ scenario: initialScenario, latencyMs: 80, processingMs: 900 });
 let selectedConversationId: string | undefined;
 let peopleById = new Map<string, string>();
 
@@ -17,7 +17,6 @@ const $ = <T extends Element>(selector: string) => {
   return node;
 };
 
-const scenarioSelect = $<HTMLSelectElement>('#scenario');
 const deviceEl = $<HTMLElement>('#device');
 const captureStatus = $<HTMLElement>('#capture-status');
 const captureButton = $<HTMLButtonElement>('#capture-button');
@@ -173,28 +172,6 @@ async function render(): Promise<void> {
   renderMemories(memories);
 }
 
-scenarioSelect.replaceChildren(
-  ...omiScenarioCatalog.map((scenario) => {
-    const option = document.createElement('option');
-    option.value = scenario.id;
-    option.textContent = scenario.label;
-    return option;
-  }),
-);
-scenarioSelect.value = initialScenario;
-
-scenarioSelect.addEventListener('change', () => {
-  const scenario = scenarioSelect.value as OmiScenarioName;
-  const url = new URL(window.location.href);
-  url.searchParams.set('scenario', scenario);
-  window.history.replaceState({}, '', url);
-  omi = new OmiMock({ scenario, latencyMs: 80, processingMs: 900 });
-  selectedConversationId = undefined;
-  askReply.textContent = '';
-  bindMock();
-  void render();
-});
-
 captureButton.addEventListener('click', async () => {
   const snapshot = await omi.getSnapshot();
   if (snapshot.capture.status === 'capturing') {
@@ -210,11 +187,34 @@ captureButton.addEventListener('click', async () => {
   await render();
 });
 
+/* Think, then stream words — the cadence of an assistant, not a modal dump. */
+let askTimer: number | undefined;
+
+function streamReply(text: string): void {
+  if (askTimer !== undefined) window.clearTimeout(askTimer);
+  const words = text.split(/(\s+)/).filter(Boolean);
+  let i = 0;
+  askReply.classList.remove('is-thinking');
+  askReply.textContent = '';
+  const tick = (): void => {
+    if (i >= words.length) {
+      askTimer = undefined;
+      return;
+    }
+    askReply.textContent = (askReply.textContent ?? '') + words[i];
+    i += 1;
+    askTimer = window.setTimeout(tick, 34);
+  };
+  tick();
+}
+
 askForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  askReply.textContent = 'Thinking…';
+  if (askTimer !== undefined) window.clearTimeout(askTimer);
+  askReply.classList.add('is-thinking');
+  askReply.innerHTML = '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>';
   const reply = await omi.askAssistant(askInput.value.trim() || 'What should I revisit?');
-  askReply.textContent = reply.text;
+  askTimer = window.setTimeout(() => streamReply(reply.text), 480);
 });
 
 bindMock();
